@@ -1,0 +1,79 @@
+{
+  "mainImage": {
+    "field": "front_photo",
+    "width": 128,
+    "height": 160,
+    "rounded": true
+  },
+  "judul": {
+    "field": "model",
+    "size": "lg",
+    "weight": "semibold",
+    "color": "text-gray-900"
+  },
+  "subjudul": {
+    "field": "plate_number",
+    "size": "sm",
+    "weight": "normal",
+    "color": "text-gray-600"
+  },
+  "status": {
+    "field": "status",
+    "size": "xs",
+    "weight": "medium",
+    "color": "text-green-700",
+    "badge_options": [
+      { "value": "Available", "label": "Available", "color": "text-green-700" },
+      { "value": "Rented", "label": "Rented", "color": "text-blue-700" },
+      {
+        "value": "Maintenance",
+        "label": "Maintenance",
+        "color": "text-yellow-700"
+      },
+      {
+        "value": "Out Of Service",
+        "label": "Out Of Service",
+        "color": "text-red-700"
+      }
+    ]
+  },
+  "infos": [
+    {
+      "field": "vehicle_type",
+      "icon": "Car",
+      "size": "sm",
+      "weight": "normal",
+      "color": "text-gray-600"
+    },
+    {
+      "field": "fuel_type",
+      "icon": "Fuel",
+      "size": "sm",
+      "weight": "normal",
+      "color": "text-gray-600"
+    },
+    {
+      "field": "number_of_seats",
+      "icon": "Users",
+      "size": "sm",
+      "weight": "normal",
+      "color": "text-gray-600"
+    },
+    {
+      "field": "location",
+      "icon": "MapPin",
+      "size": "sm",
+      "weight": "normal",
+      "color": "text-gray-600"
+    }
+  ],
+  "value": {
+    "field": "daily_rate",
+    "prefix": "Rp",
+    "suffix": "/day",
+    "size": "lg",
+    "weight": "bold",
+    "color": "text-blue-600"
+  },
+  "actions": { "view": true, "edit": true, "delete": true }
+}

@@ -1,0 +1,78 @@
+<Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex gap-4">
+          <Image
+            src={filtered{{ENTITY_PASCAL_SINGULAR}}.{{IMAGE}}_url || "/placeholder.svg"}
+            alt={`${filtered{{ENTITY_PASCAL_SINGULAR}}.{{JUDUL}}}`}
+            width={{{IMAGE_WIDTH}}}
+            height={{{IMAGE_HEIGHT}}}
+            className="w-24 h-18 object-cover rounded-lg flex-shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <h3 className="font-{{JUDUL_WEIGHT}} text-{{JUDUL_SIZE}} truncate {{JUDUL_COLOR}} dark:text-foreground">
+                  {filtered{{ENTITY_PASCAL_SINGULAR}}.{{JUDUL}}}
+                </h3>
+                <p className="text-{{SUBJUDUL_SIZE}} {{SUBJUDUL_COLOR}} dark:text-foreground">
+                  {filtered{{ENTITY_PASCAL_SINGULAR}}.{{SUBJUDUL}}}
+                </p>
+              </div>
+              {{STATUS_BADGE}}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+              {{INFO}}
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="font-{{VALUE_WEIGHT}} text-{{VALUE_SIZE}} {{VALUE_COLOR}}">
+                {{VALUE_PREFIX}} {formatRupiah(filtered{{ENTITY_PASCAL_SINGULAR}}.{{VALUE}})}{{VALUE_SUFFIX}}
+              </span>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleView(filtered{{ENTITY_PASCAL_SINGULAR}}.id)}
+                >
+                  <Eye className="h-3 w-3" />
+                </Button>
+                <Link href={`/{{ENTITY_KEBAB_SINGULAR}}/edit/${filtered{{ENTITY_PASCAL_SINGULAR}}.id}`}>
+                  <Button variant="outline" size="sm">
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                </Link>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-foreground">
+                        Delete Vehicle
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="text-muted-foreground">
+                        Are you sure you want to delete {filtered{{ENTITY_PASCAL_SINGULAR}}.{{JUDUL}}}?
+                        This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-border text-foreground hover:bg-accent hover:text-accent-foreground">
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete(filtered{{ENTITY_PASCAL_SINGULAR}}.id)}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>

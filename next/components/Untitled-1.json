@@ -1,0 +1,43 @@
+{
+  "name": "Default Layout",
+  "mainImage": {
+    "field": "plate_number",
+    "width": 128,
+    "height": 96,
+    "rounded": true
+  },
+  "judul": { "size": "lg", "weight": "semibold", "color": "text-gray-900" },
+  "subjudul": { "size": "sm", "weight": "normal", "color": "text-gray-600" },
+  "status": {
+    "size": "xs",
+    "weight": "medium",
+    "color": "text-green-700",
+    "badge_options": [
+      { "value": "available", "label": "Available", "color": "text-green-700" },
+      {
+        "value": "unavailable",
+        "label": "Unavailable",
+        "color": "text-red-700"
+      },
+      {
+        "value": "maintenance",
+        "label": "Maintenance",
+        "color": "text-yellow-700"
+      }
+    ]
+  },
+  "infos": [
+    { "icon": "Car" },
+    { "icon": "Fuel" },
+    { "icon": "Users" },
+    { "icon": "MapPin" }
+  ],
+  "value": {
+    "prefix": "Rp",
+    "suffix": "/day",
+    "size": "lg",
+    "weight": "bold",
+    "color": "text-blue-600"
+  },
+  "actions": { "view": true, "edit": true, "delete": true }
+}

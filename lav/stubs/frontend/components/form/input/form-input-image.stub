@@ -1,0 +1,27 @@
+<ImageUpload
+  title="{{LABEL}}"
+  description="Upload {{LABEL}}"
+  image={formData.{{FIELD}}_preview || formData.{{FIELD}}_url}
+  // returnType default "file" → val akan berupa File
+  onImageChange={(val) => {
+    if (val instanceof File) {
+      // Simpan File + preview (match pola stub lama Anda)
+      const preview = URL.createObjectURL(val);
+      setFormData((prev) => ({
+        ...prev,
+        "{{FIELD}}": val,
+        "{{FIELD}}_preview": preview,
+        // reset url kalau sebelumnya pakai url
+        "{{FIELD}}_url": undefined,
+      }));
+    } else {
+      // Kalau suatu saat Anda ingin kirim URL string (mis. hasil upload)
+      setFormData((prev) => ({
+        ...prev,
+        "{{FIELD}}": undefined,
+        "{{FIELD}}_preview": undefined,
+        "{{FIELD}}_url": val,
+      }));
+    }
+  }}
+/>
