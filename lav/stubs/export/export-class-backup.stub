@@ -1,0 +1,151 @@
+<?php
+
+namespace App\Exports;
+
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+
+class {{ENTITY}}Export implements
+    FromCollection, WithHeadings, WithMapping, WithEvents, WithCustomStartCell, ShouldAutoSize
+{
+    public function __construct(
+        protected ?string $search = null,
+        protected ?string $status = null,
+        protected string $city = 'Jakarta',
+        protected ?string $approvedByName = 'John',
+        protected ?string $approvedByTitle = 'Manager Operasional',
+        protected ?string $approvedDate = null
+    ) {}
+
+    public function collection(): Collection
+    {
+        $q = DB::table('{{TABLE}}');
+
+        if ($this->search) {
+            $s = "%{$this->search}%";
+            $q->where(function($qq) use ($s) {
+                $cols = DB::getSchemaBuilder()->getColumnListing('{{TABLE}}');
+                foreach ($cols as $c) $qq->orWhere($c, 'like', $s);
+            });
+        }
+
+        if ($this->status && DB::getSchemaBuilder()->hasColumn('{{TABLE}}', $this->statusColumn())) {
+            $q->where($this->statusColumn(), $this->status);
+        }
+
+        return collect($q->orderBy('id','desc')->get());
+    }
+
+    public function headings(): array
+    {
+        return [{{HEADINGS}}];
+    }
+
+    public function map($r): array
+    {
+        return [
+            {{MAPPINGS}}
+        ];
+    }
+
+    public function startCell(): string { return 'A6'; }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function(AfterSheet $e) {
+                Carbon::setLocale('id');
+
+                $s = $e->sheet->getDelegate();
+                
+                // Header
+                $s->mergeCells('A1:J1'); $s->mergeCells('A2:J2'); $s->mergeCells('A3:J3');
+                $s->setCellValue('A1', '{{BUILDER_TITLE}} — Export');
+                $s->setCellValue('A2', 'RentVix Pro');
+                $s->setCellValue('A3', 'Generated at: '.now()->format('d/m/Y H:i'));
+                $s->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+                $s->getRowDimension(1)->setRowHeight(24);
+
+                // Footer: Meta + Ringkasan + Kotak TTD
+                $last = $s->getHighestRow();
+                $meta = $last + 2;
+
+                $user = Auth::user();
+                $by   = $user?->name ?: 'Unknown User';
+                if ($user?->email) $by .= " ({$user->email})";
+
+                $s->setCellValue("A{$meta}", 'Exported by');
+                $s->setCellValue("B{$meta}", $by);
+                $s->setCellValue("A".($meta+1), 'Export date');
+                $s->setCellValue("B".($meta+1), now()->format('d/m/Y H:i'));
+
+                $sumTitle = $meta + 3;
+                $s->setCellValue("A{$sumTitle}", 'Summary');
+                $s->getStyle("A{$sumTitle}")->getFont()->setBold(true);
+
+                $total = DB::table('{{TABLE}}')->count();
+                $s->setCellValue("A".($sumTitle+1), 'Total Rows');
+                $s->setCellValue("B".($sumTitle+1), $total);
+
+                $statusCol = $this->statusColumn();
+                if ($statusCol && \Schema::hasColumn('{{TABLE}}', $statusCol)) {
+                    $rows = DB::table('{{TABLE}}')
+                        ->select($statusCol.' as v', DB::raw('count(*) c'))
+                        ->groupBy($statusCol)->get();
+                    $r = $sumTitle + 2;
+                    foreach ($rows as $row) {
+                        $s->setCellValue("A{$r}", ucfirst((string)$row->v));
+                        $s->setCellValue("B{$r}", (int)$row->c);
+                        $r++;
+                    }
+                }
+
+                // Kotak tanda tangan kanan
+                $sigTop    = $meta;
+                $sigLeft   = 'G';
+                $sigRight  = 'J';
+                $sigBottom = $meta + 6;
+                $s->mergeCells("{$sigLeft}{$sigTop}:{$sigRight}{$sigBottom}");
+
+                $city = $this->city;
+                $dateApproval = $this->approvedDate ?: now()->format('d/m/Y');
+                $lines = [
+                    "{$city}, {$dateApproval}",
+                    "Disetujui oleh,",
+                    "",
+                    "____________________________",
+                    $this->approvedByName ?: '',
+                    $this->approvedByTitle ?: '',
+                ];
+                $w = $sigTop;
+                foreach ($lines as $line) {
+                    $s->setCellValue("{$sigLeft}{$w}", $line);
+                    $s->mergeCells("{$sigLeft}{$w}:{$sigRight}{$w}");
+                    $w++;
+                }
+                $s->getStyle("{$sigLeft}{$sigTop}:{$sigRight}{$sigBottom}")
+                  ->getBorders()->getOutline()->setBorderStyle('thin');
+            },
+        ];
+    }
+
+    private function statusColumn(): ?string
+    {
+        $col = '{{STATUS_COLUMN}}';
+        return $col !== '' ? $col : null;
+    }
+}

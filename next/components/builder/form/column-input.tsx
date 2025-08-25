@@ -301,7 +301,7 @@ const getAvailableInputTypes = (dataType: string) => {
       );
     case "json":
       return INPUT_TYPES.filter((type) =>
-        ["textarea", "text"].includes(type.value)
+        ["textarea", "text", "tags"].includes(type.value)
       );
     case "string":
     case "char":

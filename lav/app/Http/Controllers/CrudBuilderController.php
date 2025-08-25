@@ -643,10 +643,64 @@ class CrudBuilderController extends Controller
         return response()->json($columns);
     }
 
+    /**
+     * Helper publish stub.
+     */
+    private function writeOnce(string $dest, string $content): void
+    {
+        File::ensureDirectoryExists(dirname($dest));
+        if (!File::exists($dest)) {
+            File::put($dest, $content);
+        }
+    }
+
+    private function publishStub(string $stubPath, string $destPath, array $repl = [], bool $overwrite = false): void
+    {
+        $tpl = File::get($stubPath);
+        $search  = array_map(fn($k) => "{{{$k}}}", array_keys($repl));
+        $content = str_replace($search, array_values($repl), $tpl);
+
+        File::ensureDirectoryExists(dirname($destPath));
+        if ($overwrite) {
+            File::put($destPath, $content);          // timpa
+        } else {
+            $this->writeOnce($destPath, $content);   // hanya jika belum ada
+        }
+    }
+
+    /**
+     * Publish runtime (backend + frontend) sekali tiap run.
+     */
+
+    private function scaffoldActionRuntime(): void
+    {
+        // BACKEND (Laravel hasil generate)
+        $back = base_path('../appgenerate/lav-gen');
+
+        $this->publishStub(base_path('stubs/runtime/ActionContract.stub'),         "$back/app/Builder/Contracts/ActionContract.php");
+        $this->publishStub(base_path('stubs/runtime/ActionRegistry.stub'),         "$back/app/Builder/ActionRegistry.php");
+        $this->publishStub(base_path('stubs/runtime/config.builder_actions.stub'), "$back/config/builder_actions.php");
+        $this->publishStub(base_path('stubs/export/pdf/ExportPdfController.stub'), "$back/app/Http/Controllers/Export/ExportPdfController.php", [], overwrite: true);
+        $this->publishStub(base_path('stubs/export/pdf/pdf_generic.stub'),         "$back/resources/views/pdf/generic.blade.php");
+
+        foreach (['UploadMasterCsv','ExportCsv','RecalculateStats'] as $a) {
+            $this->publishStub(base_path("stubs/runtime/actions/{$a}.stub"),       "$back/app/Builder/Actions/{$a}.php");
+        }
+
+        // FRONTEND (Next.js hasil generate)
+        $front = base_path('../appgenerate/next-gen');
+
+        $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),   "$front/lib/actions.ts");
+        $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),     "$front/components/actions/ActionBar.tsx");
+    }
+
     public function generate($id)
     {
         try {
-            $builder = CrudBuilder::with(['modules', 'fieldCategories', 'fields', 'stats'])->findOrFail($id);
+            // publish runtime sekali
+            $this->scaffoldActionRuntime();
+
+            $builder = CrudBuilder::with(['fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
             $table = $builder->nama_tabel; // kendaraans
             $entity = ucfirst(Str::studly($table)); // Kendaraan
             $fields = collect($builder->fields)->map(callback: fn($f) => (object) $f);
@@ -665,6 +719,12 @@ class CrudBuilderController extends Controller
 
             // tambah route ke api.php
             $this->appendRoute($table, $entity);
+
+            // export excel
+            $this->generateExportExcel($table, $entity, $builder, $tableLayout);
+
+            // Schema JSON per tabel (setiap entity)
+            $this->generateExportPdfSchema($table, $builder, $tableLayout);
 
             // migrate agar masuk ke database
             // Artisan::call('migrate');
@@ -686,7 +746,7 @@ class CrudBuilderController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => `Gagal generate CRUD untuk $entity ` . $e->getMessage(),
+                'message' => "Gagal generate CRUD untuk " . $entity . " " . $e->getMessage(),
             ], 500);
         }
     }
@@ -760,16 +820,43 @@ class CrudBuilderController extends Controller
                 $appends = ''; // tidak tulis property jika tidak ada image
             }
 
-        //     foreach ($tableColumns as $tableColumn) {
-        //         if ($tableColumn->column_layout === 'two_columns' && !is_null($tableColumn->image_settings)) {
-        //             $source = $tableColumn->image_settings['source_column'];
+            // cast
+            $castMap = [];
 
-        //             $appendImage .= <<<PHP
-        //     protected \$appends = ['{$source}_url'];
-        // PHP;
-        //         }
-        //     }
+            foreach ($fields as $field) {
+                $tipeInput = $field->tipe_input ?? null;
+                $tipeData  = $field->tipe_data  ?? null;
 
+                // Prioritas: tags atau tipe_data json => array
+                if ($tipeInput === 'tags' || $tipeData === 'json') {
+                    $castMap[$field->nama_kolom] = 'array';
+                    continue;
+                }
+
+                // Opsional (aman kalau mau kamu aktifkan):
+                if ($tipeData === 'boolean') {
+                    $castMap[$field->nama_kolom] = 'boolean';
+                } elseif ($tipeData === 'date') {
+                    $castMap[$field->nama_kolom] = 'date';
+                } elseif (in_array($tipeData, ['datetime', 'timestamp'])) {
+                    $castMap[$field->nama_kolom] = 'datetime';
+                }
+            }
+
+            $castsBlock = '';
+            if (!empty($castMap)) {
+                $castsLines = collect($castMap)
+                    ->map(fn($v, $k) => "        '{$k}' => '{$v}',")
+                    ->implode("\n");
+
+                $castsBlock = <<<PHP
+        protected \$casts = [
+    $castsLines
+        ];
+    PHP;
+            }
+
+            // relasi sepertinya masih salah dan erro nanti fix ya
             $relations = '';
             foreach ($fields as $field) {
                 if ($field->aktifkan_relasi) {
@@ -785,6 +872,7 @@ class CrudBuilderController extends Controller
                 }
             }
 
+            // image accessor
             $imageAccessors = '';
             foreach ($fields as $field) {
                 if ($field->tipe_input === 'image') {
@@ -805,8 +893,8 @@ class CrudBuilderController extends Controller
             }
 
             $content = str_replace(
-                ['{{MODEL_NAME}}', '{{TABLE_NAME}}', '{{FILLABLES}}', '{{RELATIONS}}', '{{ACCESSORS}}', '{{IMAGEAPPEND}}'],
-                [$entity, $table, $fillable, $relations, $imageAccessors, $appends],
+                ['{{MODEL_NAME}}', '{{TABLE_NAME}}', '{{FILLABLES}}', '{{RELATIONS}}', '{{ACCESSORS}}', '{{IMAGEAPPEND}}', '{{CASTS}}'],
+                [$entity, $table, $fillable, $relations, $imageAccessors, $appends, $castsBlock],
                 $template
             );
 
@@ -819,12 +907,13 @@ class CrudBuilderController extends Controller
     private function generateController($entity, $fields)
     {
         try {
-            $template = File::get(base_path('stubs/controller.stub'));
+            // $template = File::get(base_path('stubs/controller.stub'));
 
             $modelName = ucfirst(Str::camel($entity));
             $controllerName = $modelName . 'Controller';
             $variableName = '$' . strtolower($entity);
             $tableName = $entity;
+            $routePath = Str::kebab(Str::plural($tableName)); // ex: kendaraans
 
             $validations = '';
             $storeImageCode = '';
@@ -861,12 +950,6 @@ class CrudBuilderController extends Controller
                     $rules[] = 'max:' . $field->panjang;
                 }
 
-                // enum (soon pengembangan)
-                // if ($field->tipe_data === 'enum' && is_array($field->enum_options)) {
-                //     $enumValues = implode(',', $field->enum_options);
-                //     $rules[] = 'in:' . $enumValues;
-                // }
-
                 // relasi
                 if (!empty($field->aktifkan_relasi) && $field->tabel_relasi && $field->kolom_relasi) {
                     $rules[] = 'exists:' . $field->tabel_relasi . ',' . $field->kolom_relasi;
@@ -881,6 +964,11 @@ class CrudBuilderController extends Controller
                     if (is_array($options)) {
                         $rules[] = 'in:' . implode(',', $options);
                     }
+                }
+
+                // tags
+                if ($field->tipe_input === 'tags' && $field->tipe_data === 'json') {
+                    $rules[] = 'array';
                 }
 
                 // image
@@ -910,12 +998,41 @@ PHP;
                 $validations .= "            '{$field->nama_kolom}' => '" . implode('|', $rules) . "',\n";
             }
 
-            $content = str_replace(
-                ['{{VARIABLE_NAME}}', '{{MODEL_NAME}}', '{{CONTROLLER_NAME}}', '{{VALIDATIONS}}', '{{TABLE_NAME}}', '{{STORE_IMAGE_CODE}}', '{{UPDATE_IMAGE_CODE}}', '{{ASSIGN_DATA}}'],
-                [$variableName, $modelName, $controllerName, $validations, $tableName, $storeImageCode, $updateImageCode, $assignData],
-                $template
+            // $content = str_replace(
+            //     ['{{VARIABLE_NAME}}', '{{MODEL_NAME}}', '{{CONTROLLER_NAME}}', '{{VALIDATIONS}}', '{{TABLE_NAME}}', '{{STORE_IMAGE_CODE}}', '{{UPDATE_IMAGE_CODE}}', '{{ASSIGN_DATA}}'],
+            //     [$variableName, $modelName, $controllerName, $validations, $tableName, $storeImageCode, $updateImageCode, $assignData],
+            //     $template
+            // );
+            // File::put(base_path("../appgenerate/lav-gen/app/Http/Controllers/Generate/{$controllerName}.php"), $content);
+
+            // BASE Controller  (overwrite)
+            $basePath  = base_path("../appgenerate/lav-gen/app/Http/Controllers/Generate/{$controllerName}.php");
+            $this->publishStub(
+                base_path('stubs/controller.base.stub'),
+                $basePath,
+                [
+                    'MODEL_NAME'        => $modelName,
+                    'CONTROLLER_NAME'   => $controllerName,
+                    'ROUTE_PATH'        => $routePath,
+                    'VALIDATIONS'       => $validations,
+                    'ASSIGN_DATA'       => $assignData,
+                    'STORE_IMAGE_CODE'  => $storeImageCode,
+                    'UPDATE_IMAGE_CODE' => $updateImageCode,
+                ],
+                overwrite: true
             );
-            File::put(base_path("../appgenerate/lav-gen/app/Http/Controllers/Generate/{$controllerName}.php"), $content);
+
+            // Override Controller (write-once)
+            $childPath = base_path("../appgenerate/lav-gen/app/Http/Controllers/Overrides/{$controllerName}.php");
+            $this->publishStub(
+                base_path('stubs/controller.child.stub'),
+                $childPath,
+                [
+                    'CONTROLLER_NAME'   => $controllerName,
+                    'ROUTE_PATH'        => $routePath,
+                ],
+                overwrite: false
+            );
         } catch (\Exception $e) {
             throw new \Exception("Gagal generate controller " . $e->getMessage());
         }
@@ -924,28 +1041,200 @@ PHP;
     private function appendRoute($table, $entity)
     {
         try {
-            $template = File::get(base_path('stubs/route.stub'));
+            // $template = File::get(base_path('stubs/route.stub'));
 
             $routePath = Str::kebab(Str::plural($table));
             $controllerName = ucfirst(Str::camel($entity)) . 'Controller';
+            
             $apiFile = base_path('../appgenerate/lav-gen/routes/api.php');
-            $existingRoutes = File::get($apiFile);
-
-            if (Str::contains($existingRoutes, "Route::apiResource('$routePath'")) {
-                // Sudah ada, tidak perlu ditambahkan lagi
-                return;
+            if (!File::exists($apiFile)) {
+                File::ensureDirectoryExists(dirname($apiFile));
+                File::put($apiFile, "<?php\n");
             }
 
+            $existingRoutes = File::get($apiFile);
+
+            // Cek apakah apiResource untuk entity ini sudah ada
+            if (Str::contains($existingRoutes, "Route::apiResource('$routePath'")) {
+                return; // sudah ditulis, skip
+            }
+
+            // Route stub sudah mengarah ke Overrides dan menambah endpoints actions
             $content = str_replace(
                 ['{{ROUTE_PATH}}', '{{CONTROLLER_NAME}}'],
                 [$routePath, $controllerName],
-                $template
+                File::get(base_path('stubs/route.stub'))
             );
 
-            File::append(base_path('../appgenerate/lav-gen/routes/api.php'), "\n" . $content);
+            File::append($apiFile, "\n" . $content);
         } catch (\Exception $e) {
             throw new \Exception("Gagal generate route " . $e->getMessage());
         }
+    }
+
+    // export excel
+    private function generateExportExcel($table, $entity, $builder, $tableLayout)
+    {
+        $singularSnake = Str::singular($entity); // nama_file
+        $singularHeadline = Str::headline($singularSnake); // Nama File
+
+        // 1) Ambil kolom dari Table Layout; fallback ke semua fields
+        $cols = [];            // [ ['source'=>'plate_number','label'=>'Plate Number','display'=>'text|currency|date|...'], ... ]
+        if ($tableLayout && $tableLayout->columns && count($tableLayout->columns)) {
+            foreach ($tableLayout->columns as $c) {
+                if (!empty($c->contents)) {
+                    foreach ($c->contents as $content) {
+                        $src    = $content->source_column;
+                        $label  = $content->label_id ?? \Str::headline($src);
+                        $disp   = $content->display_type ?? null; // <- untuk format kolom
+                        $cols[] = ['source' => $src, 'label' => $label, 'display' => $disp];
+                    }
+                } else {
+                    // Kolom tanpa "contents": tebak nama source dari label (snake)
+                    $src    = \Str::snake($c->label_id);
+                    $cols[] = ['source' => $src, 'label' => $c->label_id, 'display' => null];
+                }
+            }
+        } else {
+            // Fallback: pakai semua field dari builder
+            foreach ($builder->fields as $f) {
+                $cols[] = [
+                    'source'  => $f->nama_kolom,
+                    'label'   => $f->label_id ?? \Str::headline($f->nama_kolom),
+                    'display' => null, // tidak ada info display_type
+                ];
+            }
+        }
+
+        // 2) HEADINGS dan MAPPINGS
+        $headings = collect($cols)
+            ->pluck('label')
+            ->map(fn($l) => "'" . addslashes($l) . "'")
+            ->implode(', ');
+
+        $mappings = collect($cols)
+            ->map(fn($c) => "\$r->{$c['source']}")
+            ->implode(",\n            ");
+
+        // 3) Deteksi kolom status (opsional, utk summary/filter)
+        $statusColumn = collect($cols)
+            ->first(fn($c) => in_array(strtolower($c['source']), ['status', 'state']))['source'] ?? '';
+
+        // 4) Generate potongan kode format kolom (berdasarkan display_type dari table_layout)
+        $currencyIdx = [];
+        $dateIdx     = [];
+        $i = 1; // index kolom 1-based sesuai urutan headings
+        foreach ($cols as $c) {
+            $disp = strtolower((string)($c['display'] ?? ''));
+            if ($disp === 'currency') $currencyIdx[] = $i;
+            if ($disp === 'date')     $dateIdx[]     = $i;
+            $i++;
+        }
+
+        $columnFormatsPhp = '';
+        foreach ($currencyIdx as $idx) {
+            $columnFormatsPhp .= <<<PHP
+            if (\$dataEndRow >= \$dataStartRow) {
+                \$col = \\PhpOffice\\PhpSpreadsheet\\Cell\\Coordinate::stringFromColumnIndex($idx);
+                \$s->getStyle("\$col{\$dataStartRow}:\$col{\$dataEndRow}")
+                ->getNumberFormat()->setFormatCode('#,##0');
+                \$s->getStyle("\$col{\$dataStartRow}:\$col{\$dataEndRow}")
+                ->getAlignment()->setHorizontal(\\PhpOffice\\PhpSpreadsheet\\Style\\Alignment::HORIZONTAL_RIGHT);
+            }
+
+            PHP;
+        }
+        foreach ($dateIdx as $idx) {
+            $columnFormatsPhp .= <<<PHP
+            if (\$dataEndRow >= \$dataStartRow) {
+                \$col = \\PhpOffice\\PhpSpreadsheet\\Cell\\Coordinate::stringFromColumnIndex($idx);
+                \$s->getStyle("\$col{\$dataStartRow}:\$col{\$dataEndRow}")
+                ->getNumberFormat()->setFormatCode('dd/mm/yyyy');
+            }
+
+            PHP;
+        }
+        if (trim($columnFormatsPhp) === '') {
+            $columnFormatsPhp = '// no special formats';
+        }
+
+        // 5) Tulis Export Class dari stub BARU (tetap pakai path stub milikmu)
+        $this->publishStub(
+        base_path('stubs/export/export-class.stub'),
+        base_path("../appgenerate/lav-gen/app/Exports/{$entity}Export.php"),
+        [
+            'ENTITY'           => $entity,
+            'TABLE'            => $table,
+            'HEADINGS'         => $headings,
+            'MAPPINGS'         => $mappings,
+            'STATUS_COLUMN'    => $statusColumn,
+            'BUILDER_TITLE'    => addslashes($builder->judul ?? \Str::headline($table)),
+
+            // ====== tambahan untuk letterhead ======
+            'LOGO_PATH'        => 'logo/rentvixpro-transparent.png', // relative ke public_path()
+            'LOGO_HEIGHT'      => '84',               // px
+            'LOGO_COL_WIDTH'   => '20',               // lebar kolom A (Excel units)
+
+            'HDR_ROW1_HEIGHT' => '28',
+            'HDR_ROW2_HEIGHT' => '24',
+            'HDR_ROW3_HEIGHT' => '20',
+            'LETTERHEAD_LINE1' => addslashes(strtoupper('RentVix Pro')),
+            'LETTERHEAD_LINE2' => addslashes("{$builder->judul} - Export"),
+
+            // ====== placeholder yang sudah ada sebelumnya ======
+            'GAP_ROWS'         => '4',
+            'SIG_WIDTH_COLS'   => '3',
+            'COLUMN_FORMATS'   => rtrim($columnFormatsPhp), // dari versi sebelumnya
+            'ENTITY_HEADLINE_SINGULAR' => $singularHeadline,
+        ],
+        overwrite: true
+    );
+    }
+
+    // export pdf schema
+    private function generateExportPdfSchema($table, $builder, $tableLayout): void
+    {
+        // 1) Ambil kolom dari Table Layout; fallback ke semua fields
+        $cols = [];
+        if ($tableLayout && $tableLayout->columns && count($tableLayout->columns)) {
+            foreach ($tableLayout->columns as $c) {
+                if (!empty($c->contents)) {
+                    foreach ($c->contents as $content) {
+                        $src   = $content->source_column;
+                        $label = $content->label_id ?? \Str::headline($src);
+                        $disp  = $content->display_type ?? null; // text|date|currency|badge|number|image|icon_text
+                        $cols[] = ['source'=>$src,'label'=>$label,'display'=>$disp];
+                    }
+                } else {
+                    $src   = \Str::snake($c->label_id);
+                    $cols[] = ['source'=>$src,'label'=>$c->label_id,'display'=>null];
+                }
+            }
+        } else {
+            foreach ($builder->fields as $f) {
+                $cols[] = [
+                    'source'  => $f->nama_kolom,
+                    'label'   => $f->label_id ?? \Str::headline($f->nama_kolom),
+                    'display' => null,
+                ];
+            }
+        }
+
+        // 2) Schema JSON (ringkasan default bisa kamu ubah)
+        $schema = [
+            'title'      => $builder->judul ?? \Str::headline($table),
+            'menu_title' => $builder->judul_menu ?? \Str::headline($table),
+            'table'      => $table,
+            'columns'    => $cols,
+            'summary'    => [
+                'group_by' => 'status', // akan diabaikan jika kolom 'status' tidak ada
+                'sum'      => []        // contoh: ['total_biaya','harga_sewa']
+            ],
+        ];
+
+        $jsonPath = base_path("../appgenerate/lav-gen/resources/builder_schema");
+        \File::ensureDirectoryExists($jsonPath);
+        \File::put("$jsonPath/{$table}.json", json_encode($schema, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
     }
 
     // func generate frontend
@@ -980,6 +1269,10 @@ PHP;
             File::ensureDirectoryExists($folderView);
             File::ensureDirectoryExists($folderComp);
             File::ensureDirectoryExists($folderForm);
+
+            // Publish runtime Frontend (sekali)
+            $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),  base_path("../appgenerate/next-gen/lib/actions.ts"));
+            $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),    base_path("../appgenerate/next-gen/components/actions/ActionBar.tsx"));
 
             // generate index (app/(nama-folder)/page.tsx)
             $indexTemplate = File::get(base_path('stubs/frontend/app/page-index.stub'));
@@ -1158,6 +1451,11 @@ PHP;
                     elseif ($type === 'password') {
                         $stub = File::get(base_path('stubs/frontend/components/form/input/form-input-password.stub'));
                     }
+
+                    // tag
+                    elseif ($type === 'tags') {
+                        $stub = File::get(base_path('stubs/frontend/components/form/input/form-input-tags.stub'));
+                    }
                     
                     // default
                     else {
@@ -1186,6 +1484,9 @@ PHP;
                     $inputFields
                 ], $sectionCardTemplate) . "\n\n";
             }
+
+            // DIBAWAH INI KODENYA BELUM SELESAI YAA LANJUTKAN
+            // $tagsField = collect($fields)->filter(fn($f) => in_array($f->tipe_input ?? '', ['tags']))->
             
             $formFieldsTemplate = File::get(base_path('stubs/frontend/components/form/page-form-fields.stub'));
             File::put("$folderForm/$singularKebab-form-fields.tsx", str_replace([
@@ -1537,7 +1838,9 @@ BADGE;
                 '{{ENTITY_HEADLINE}}',
                 '{{ENTITY_HEADLINE_SINGULAR}}',
                 '{{ENTITY_KEBAB_SINGULAR}}',
-                '{{CARD_MOBILE_VIEW}}'
+                '{{CARD_MOBILE_VIEW}}',
+                '{{ENTITY_SNAKE_SINGULAR}}',
+                '{{ENTITY_PLURAL}}'
                 // '{{KOLOM_PERTAMA}}'
             ], [
                 $headers,
@@ -1552,7 +1855,9 @@ BADGE;
                 $entityHeadline,
                 $singularHeadline,
                 $singularKebab,
-                $cardContent
+                $cardContent,
+                $singularSnake,
+                $entityPlural
                 // $kolomPertama
             ], $tableContent));
 

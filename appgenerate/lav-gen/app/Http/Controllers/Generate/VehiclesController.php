@@ -5,43 +5,34 @@ namespace App\Http\Controllers\Generate;
 use App\Http\Controllers\Controller;
 use App\Models\Vehicles;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\VehiclesExport;
 
 class VehiclesController extends Controller
 {
-    public function index()
+    protected string $entityRoute = 'vehicles';
+
+    public function index(Request $request)
     {
-        try {
-            $vehicles = Vehicles::orderByDesc('updated_at')->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => "Berhasil menampilkan data Vehicles",
-                'data' => $vehicles,
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success'=> false,
-                'message' => "Gagal menampilkan data Vehicles " . $e->getMessage(),
-            ], 500);
+        $q = Vehicles::query();
+        if ($s = $request->get('search')) {
+            $q->where(function ($w) use ($s) {
+                $w->where('id', 'like', "%$s%");
+            });
         }
-    }
+        // return response()->json($q->paginate((int)($request->get('per_page', 15))));
 
-    public function show($id)
-    {
-        try {
-            $vehicles = Vehicles::findOrFail($id);
+        // opsional: urutan default
+        $q->latest('id'); // atau created_at
 
-            return response()->json([
-                'success' => true,
-                'message' => "Berhasil menampilkan data Vehicles dari id: $id",
-                'data' => $vehicles,
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success'=> false,
-                'message' => "Gagal menampilkan data Vehicles dari id: $id " . $e->getMessage(),
-            ], 500);
-        }
+        $data = $q->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil mengambil data vehicles',
+            'total'   => $data->count(),
+            'data'    => $data,
+        ]);
     }
 
     public function store(Request $request)
@@ -60,21 +51,14 @@ class VehiclesController extends Controller
             'daily_rate' => 'required|numeric',
             'location' => 'required',
             'status' => 'required|in:Available,Rented,Maintenance,Out Of Service',
-            'features' => 'required',
+            'features' => 'required|array',
             'front_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'side_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'back_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'description' => 'required',
-
         ]);
 
-            if ($request->hasFile('front_photo')) {
-                $data['front_photo'] = $request->file('front_photo')->store('uploads/Vehicles', 'public');
-            }            if ($request->hasFile('side_photo')) {
-                $data['side_photo'] = $request->file('side_photo')->store('uploads/Vehicles', 'public');
-            }            if ($request->hasFile('back_photo')) {
-                $data['back_photo'] = $request->file('back_photo')->store('uploads/Vehicles', 'public');
-            }
+        $data = [];
         $data['plate_number'] = $validated['plate_number'] ?? null;
         $data['brand'] = $validated['brand'] ?? null;
         $data['model'] = $validated['model'] ?? null;
@@ -91,14 +75,27 @@ class VehiclesController extends Controller
         $data['features'] = $validated['features'] ?? null;
         $data['description'] = $validated['description'] ?? null;
 
+            if ($request->hasFile('front_photo')) {
+                $data['front_photo'] = $request->file('front_photo')->store('uploads/Vehicles', 'public');
+            }            if ($request->hasFile('side_photo')) {
+                $data['side_photo'] = $request->file('side_photo')->store('uploads/Vehicles', 'public');
+            }            if ($request->hasFile('back_photo')) {
+                $data['back_photo'] = $request->file('back_photo')->store('uploads/Vehicles', 'public');
+            }
 
-        return Vehicles::create($data);
+        $row = Vehicles::create($data);
+        return response()->json(['success'=>true, 'data'=>$row], 201);
+    }
+
+    public function show($id)
+    {
+        $row = Vehicles::findOrFail($id);
+        return response()->json(['success'=>true, 'data'=>$row]);
     }
 
     public function update(Request $request, $id)
     {
-        $vehicles = Vehicles::findOrFail($id);
-
+        $row = Vehicles::findOrFail($id);
         $validated = $request->validate([
             'plate_number' => 'required',
             'brand' => 'required',
@@ -113,29 +110,14 @@ class VehiclesController extends Controller
             'daily_rate' => 'required|numeric',
             'location' => 'required',
             'status' => 'required|in:Available,Rented,Maintenance,Out Of Service',
-            'features' => 'required',
+            'features' => 'required|array',
             'front_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'side_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'back_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'description' => 'required',
-
         ]);
 
         $data = [];
-
-            if ($request->hasFile('front_photo')) {
-                $data['front_photo'] = $request->file('front_photo')->store('uploads/Vehicles', 'public');
-            } else {
-                unset($data['front_photo']);
-            }            if ($request->hasFile('side_photo')) {
-                $data['side_photo'] = $request->file('side_photo')->store('uploads/Vehicles', 'public');
-            } else {
-                unset($data['side_photo']);
-            }            if ($request->hasFile('back_photo')) {
-                $data['back_photo'] = $request->file('back_photo')->store('uploads/Vehicles', 'public');
-            } else {
-                unset($data['back_photo']);
-            }
         $data['plate_number'] = $validated['plate_number'] ?? null;
         $data['brand'] = $validated['brand'] ?? null;
         $data['model'] = $validated['model'] ?? null;
@@ -152,14 +134,45 @@ class VehiclesController extends Controller
         $data['features'] = $validated['features'] ?? null;
         $data['description'] = $validated['description'] ?? null;
 
+            if ($request->hasFile('front_photo')) {
+                $data['front_photo'] = $request->file('front_photo')->store('uploads/Vehicles', 'public');
+            } else {
+                unset($data['front_photo']);
+            }            if ($request->hasFile('side_photo')) {
+                $data['side_photo'] = $request->file('side_photo')->store('uploads/Vehicles', 'public');
+            } else {
+                unset($data['side_photo']);
+            }            if ($request->hasFile('back_photo')) {
+                $data['back_photo'] = $request->file('back_photo')->store('uploads/Vehicles', 'public');
+            } else {
+                unset($data['back_photo']);
+            }
 
-        $vehicles->update($data);
-        return $vehicles;
+        $row->update($data);
+        return response()->json(['success'=>true, 'data'=>$row]);
     }
 
     public function destroy($id)
     {
-        Vehicles::destroy($id);
-        return response()->json(['message' => '🗑️ Dihapus']);
+        $row = Vehicles::findOrFail($id);
+        $row->delete();
+        return response()->json(['success'=>true]);
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $file = 'Vehicles_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(
+            new VehiclesExport(
+                search: $request->query('search'),
+                status: $request->query('status'),
+                city: $request->query('city', 'Jakarta'),
+                approvedByName: $request->query('approved_by_name', 'Manager Operasional'),
+                approvedByTitle: $request->query('approved_by_title', 'Manager Operasional'),
+                approvedDate: $request->query('approved_date')
+            ),
+            $file
+        );
     }
 }

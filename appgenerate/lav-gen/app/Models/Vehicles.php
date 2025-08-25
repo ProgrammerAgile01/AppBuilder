@@ -29,6 +29,10 @@ class Vehicles extends Model
     ];
 
     protected $appends = ['front_photo_url', 'side_photo_url', 'back_photo_url'];
+
+        protected $casts = [
+        'features' => 'array',
+    ];
     
     
 

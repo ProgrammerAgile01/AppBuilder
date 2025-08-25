@@ -11,10 +11,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Camera, X } from "lucide-react";
+import { Camera, Plus, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 type ImageUploadValue = File | string | undefined;
 
@@ -129,6 +130,37 @@ export function VehicleFormFields({
     setFormData: React.Dispatch<React.SetStateAction<Record<string, any>>>;
     mode: "create" | "edit";
 }) {
+    const [newTags, setNewTags] = useState("");
+
+    const parseJSON = (s: any) => {
+      if (typeof s !== "string") return s;
+      try {
+        return JSON.parse(s);
+      } catch {
+        return s;
+      }
+    };
+
+    const toArray = (v: any): any[] => {
+      const p = parseJSON(v);
+      return Array.isArray(p) ? p : [];
+    };
+
+    // Ambil label dari berbagai bentuk objek
+    const toTag = (item: any): string => {
+      if (typeof item === "string") return item.trim();
+      if (item && typeof item === "object") {
+        return String(
+          item.label ?? item.text ?? item.name ?? item.value ?? ""
+        ).trim();
+      }
+      return "";
+    };
+
+    // Fungsinya: apa pun bentuk `formData.features`, hasil akhirnya array<string> rapi
+    const normalizeTags = (v: any): string[] =>
+      toArray(v).map(toTag).filter(Boolean);
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -363,18 +395,36 @@ export function VehicleFormFields({
     </CardHeader>
     <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1">
-  <Label htmlFor="features" className="text-foreground">Features*</Label>
-  <Input
-    type="text"
-    id="features"
-    placeholder="e.g., AC"
-    value={formData.features || ""}
-    onChange={(e) => setFormData((prev) => ({ ...prev, "features": e.target.value }))}
-    className="text-foreground placeholder:text-muted-foreground"
-    required
-  />
-</div>
+         <div className="flex gap-2">
+    <Input
+      value={newTags}
+      onChange={(e) => setNewTags(e.target.value)}
+      placeholder="Add a tags..."
+      onKeyPress={(e) =>
+        e.key === "Enter" && (e.preventDefault(), handleAddTags())
+      }
+      className="text-foreground placeholder:text-muted-foreground"
+    />
+    <Button type="button" onClick={handleAddTags} size="sm">
+      <Plus className="h-4 w-4" />
+    </Button>
+  </div>
+
+  <div className="flex flex-wrap gap-2">
+    {tags.map((tag: any, index: any) => (
+      <Badge
+        key={index}
+        variant="secondary"
+        className="flex items-center gap-1"
+      >
+        {tag}
+        <X
+          className="h-3 w-3 cursor-pointer hover:text-destructive"
+          onClick={() => handleRemoveTag(tag)}
+        />
+      </Badge>
+    ))}
+  </div>
 
 
         </div>

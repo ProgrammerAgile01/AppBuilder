@@ -21,7 +21,7 @@ return new class extends Migration {
             $table->integer('daily_rate');
             $table->string('location');
             $table->enum('status', ['Available', 'Rented', 'Maintenance', 'Out Of Service']);
-            $table->string('features');
+            $table->json('features');
             $table->string('front_photo')->nullable();
             $table->string('side_photo')->nullable();
             $table->string('back_photo')->nullable();

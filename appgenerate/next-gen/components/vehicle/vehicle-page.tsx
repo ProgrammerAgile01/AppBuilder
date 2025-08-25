@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { VehicleHeader, VehicleFilters, VehicleTable, ResultsInfo } from "./vehicle-page-contents";
 import { deleteData, fetchData } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,8 @@ import {
 import { Separator } from "../ui/separator";
 import { useRouter } from "next/navigation";
 
+import ActionBar from "@/components/actions/ActionBar";
+
 const ITEMS_PER_PAGE = 10
 
 export function VehiclePage() {
@@ -30,34 +32,41 @@ export function VehiclePage() {
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [currentPage, setCurrentPage] = useState(1);
 
+    const refetch = useCallback(async (signal?: AbortSignal) => {
+        setLoading(true);
+        try {
+            // kalau nanti butuh stats juga:
+            // const [dataItems/*, dataStats*/] = await Promise.all([
+            //   fetchData("vehicles", { signal }),
+            //   fetchModuleStats({ signal }),
+            // ]);
+            const dataItems = await fetchData("vehicles", { signal });
+            if (signal?.aborted) return;
+            setItems(dataItems);
+            // setStats(dataStats);
+        } catch (err: any) {
+            if (err?.name === "AbortError") return;
+            toast({
+                title: "Gagal Memuat Data",
+                description: err?.message || "Terjadi kesalahan saat mengambil data dari server",
+                variant: "destructive",
+            });
+        } finally {
+            if (!signal?.aborted) setLoading(false);
+        }
+    }, [toast]);
+
+    // scroll awal (tetap terpisah)
     useEffect(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
     }, []);
 
+    // initial load
     useEffect(() => {
-        const load = async () => {
-            try {
-                const [dataItems] = await Promise.all([
-                // const [dataItems, dataStats] = await Promise.all([
-                    fetchData("vehicles"),
-                    // fetchModuleStats(),
-                ]);
-
-                setItems(dataItems);
-                // setStats(dataStats);
-            } catch (err) {
-                toast({
-                    title: "Gagal Memuat Data",
-                    description: "Terjadi kesalahan saat mengambil data dari server",
-                    variant: "destructive",
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        load();
-    }, []);
+        const ctrl = new AbortController();
+        refetch(ctrl.signal);
+        return () => ctrl.abort();
+    }, [refetch]);
 
     const filteredVehicle = useMemo(() => {
         // return items.filter((item) => {
@@ -148,7 +157,10 @@ export function VehiclePage() {
 
                     <div className="flex flex-1 flex-col">
                         <div className="space-y-6 p-4">
-                            <VehicleHeader onAdd={handleAdd} />
+                            <div className="flex items-center justify-between gap-3">
+                                <VehicleHeader onAdd={handleAdd} />
+                                <ActionBar entity="vehicles" onDone={() => refetch()} />
+                            </div>
                             <VehicleFilters searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
                             <ResultsInfo total={filteredVehicle.length} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} />
                             <VehicleTable handleView={handleView} handleDelete={handleDelete} filteredVehicle={filteredVehicle} />

@@ -1,16 +1,7 @@
 "use client";
 
-import {
-  Car,
-  Circle,
-  Edit,
-  Eye,
-  Fuel,
-  MapPin,
-  Plus,
-  Trash2,
-  Users,
-} from "lucide-react";
+import { useState } from "react";
+import { Car, Circle, Edit, Eye, Fuel, MapPin, Plus, Trash2, Users, Download, Sparkles, Upload, FileSpreadsheet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -20,35 +11,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 // import { type Vehicle } from "@/lib/vehicle-data";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { downloadExcel, downloadPdf } from "@/lib/api";
 
 const formatRupiah = (v: number | string) =>
   new Intl.NumberFormat("id-ID", { minimumFractionDigits: 0 }).format(
@@ -56,20 +39,144 @@ const formatRupiah = (v: number | string) =>
   );
 
 // Header
-export function VehicleHeader({ onAdd }: { onAdd: () => void }) {
+export function VehicleHeader({
+  onAdd,
+  search,
+  status,
+}: {
+  onAdd: () => void;
+  search?: string;
+  status?: string;
+}) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      await downloadExcel("vehicles", {
+        // metadata header + tanda tangan di file Excel:
+          city: "Boyolali",
+          approved_by_name: "Manager Operasional",
+          approved_by_title: "Manager Operasional",
+          // approved_date: "21/08/2025", // kalau ingin set manual
+
+          // set true kalau backend pakai session/cookie auth
+          withCredentials: false,
+      },
+      "vehicle_export.xlsx"
+    );
+    } catch (e: any) {
+      alert(e?.message || "Gagal export Excel");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      await downloadPdf("vehicles", {
+        approver_name: "Budi Santoso",
+        approver_title: "Kepala Operasional",
+        place: "Boyolali",  
+        // columns: "plate_number,brand,year,status", // kalau mau custom kolom
+        // limit: 200,
+        withCredentials: false,
+      }, "vehicle_report.pdf");
+    } catch (e: any) {
+      alert(e?.message || "Gagal export PDF");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  // next feature
+  const handleImportExcel = () => alert("TODO: Import CSV/Excel");
+
   return (
-    <div className="sticky top-16 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-4 px-4 pt-4">
+    <div className="sticky top-16 z-10 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-4 px-4 pt-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Vehicle Management
-          </h1>
+          <h1 className="text-2xl font-bold text-foreground">Vehicle Management</h1>
           <p className="text-muted-foreground">Manage your fleet of vehicles</p>
         </div>
-        <Button onClick={onAdd} className="shrink-0">
-          <Plus className="h-4 w-4 mr-2" />
-          Tambah Vehicle
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200 text-purple-700 font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                disabled={isExporting || isImporting}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isExporting || isImporting ? "Processing..." : "Export/Import"}{" "}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-64 p-2 bg-white/95 backdrop-blur-sm border-purple-100 shadow-xl"
+            >
+              <DropdownMenuItem
+                onClick={handleExportPDF}
+                disabled={isExporting || isImporting}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    Modern PDF Report
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Beautiful design with gradients & styling
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportExcel}
+                disabled={isExporting || isImporting}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    Export ke CSV/Excel
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Data terstruktur untuk analisis
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-2 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+              <DropdownMenuItem
+                onClick={handleImportExcel}
+                disabled={isExporting || isImporting}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-amber-600 text-white">
+                  <Upload className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    Import dari CSV
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Upload data Vehicle bulk
+                  </div>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button onClick={onAdd} className="shrink-0">
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah Vehicle
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -79,11 +186,11 @@ export function VehicleHeader({ onAdd }: { onAdd: () => void }) {
 export function VehicleFilters({
   searchTerm,
   setSearchTerm,
-}: // statusFilter,
-// setStatusFilter,
-// typeFilter,
-// setTypeFilter,
-{
+  // statusFilter,
+  // setStatusFilter,
+  // typeFilter,
+  // setTypeFilter,
+}: {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
   // statusFilter: string;
@@ -134,7 +241,7 @@ export function VehicleFilters({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 export function ResultsInfo({
@@ -151,8 +258,7 @@ export function ResultsInfo({
   return (
     <div className="flex justify-between items-center">
       <p className="text-sm text-muted-foreground">
-        Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, total)} of{" "}
-        {total} Vehicle
+        Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, total)} of {total} Vehicle
       </p>
     </div>
   );
@@ -191,63 +297,31 @@ function MobileVehicleCard({
                 </p>
               </div>
               {(() => {
-                switch (filteredVehicle.status) {
-                  case "Available":
-                    return (
-                      <Badge className="bg-green-100 text-green-700">
-                        Available
-                      </Badge>
-                    );
-                  case "Rented":
-                    return (
-                      <Badge className="bg-blue-100 text-blue-700">
-                        Rented
-                      </Badge>
-                    );
-                  case "Maintenance":
-                    return (
-                      <Badge className="bg-yellow-100 text-yellow-700">
-                        Maintenance
-                      </Badge>
-                    );
-                  case "Out Of Service":
-                    return (
-                      <Badge className="bg-red-100 text-red-700">
-                        Out Of Service
-                      </Badge>
-                    );
+    switch (filteredVehicle.status) {
+        case 'Available' : return <Badge className='bg-green-100 text-green-700'>Available</Badge>;
+case 'Rented' : return <Badge className='bg-blue-100 text-blue-700'>Rented</Badge>;
+case 'Maintenance' : return <Badge className='bg-yellow-100 text-yellow-700'>Maintenance</Badge>;
+case 'Out Of Service' : return <Badge className='bg-red-100 text-red-700'>Out Of Service</Badge>;
 
-                  default:
-                    return filteredVehicle.status;
-                }
-              })()}
+        default: return filteredVehicle.status;
+    }
+})()}
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs mb-3">
               <div className="flex items-center gap-1">
-                <Car className="h-3 w-3 text-gray-600 dark:text-foreground" />
-                <span className="text-gray-600 dark:text-foreground">
-                  {filteredVehicle.vehicle_type}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Fuel className="h-3 w-3 text-gray-600 dark:text-foreground" />
-                <span className="text-gray-600 dark:text-foreground">
-                  {filteredVehicle.fuel_type}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Users className="h-3 w-3 text-gray-600 dark:text-foreground" />
-                <span className="text-gray-600 dark:text-foreground">
-                  {filteredVehicle.number_of_seats}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 text-gray-600 dark:text-foreground" />
-                <span className="text-gray-600 dark:text-foreground">
-                  {filteredVehicle.location}
-                </span>
-              </div>
+    <Car className="h-3 w-3 text-gray-600 dark:text-foreground" />
+    <span className="text-gray-600 dark:text-foreground">{filteredVehicle.vehicle_type}</span>
+</div><div className="flex items-center gap-1">
+    <Fuel className="h-3 w-3 text-gray-600 dark:text-foreground" />
+    <span className="text-gray-600 dark:text-foreground">{filteredVehicle.fuel_type}</span>
+</div><div className="flex items-center gap-1">
+    <Users className="h-3 w-3 text-gray-600 dark:text-foreground" />
+    <span className="text-gray-600 dark:text-foreground">{filteredVehicle.number_of_seats}</span>
+</div><div className="flex items-center gap-1">
+    <MapPin className="h-3 w-3 text-gray-600 dark:text-foreground" />
+    <span className="text-gray-600 dark:text-foreground">{filteredVehicle.location}</span>
+</div>
             </div>
 
             <div className="flex justify-between items-center">
@@ -301,14 +375,14 @@ function MobileVehicleCard({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // desktop View
 export function VehicleTable({
   handleView,
   handleDelete,
-  filteredVehicle,
+  filteredVehicle
 }: {
   handleView: (id: string) => void;
   handleDelete: (id: string) => void;
@@ -333,97 +407,49 @@ export function VehicleTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-foreground">Vehicle</TableHead>
-              <TableHead className="text-foreground">Type</TableHead>
-              <TableHead className="text-foreground">Status</TableHead>
-              <TableHead className="text-foreground">Daily Rate</TableHead>
+              <TableHead className='text-foreground'>Vehicle</TableHead>
+<TableHead className='text-foreground'>Type</TableHead>
+<TableHead className='text-foreground'>Status</TableHead>
+<TableHead className='text-foreground'>Daily Rate</TableHead>
 
               <TableHead className="text-right text-foreground">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVehicle.map((item: any) => (
+            { filteredVehicle.map((item: any) => (
               <TableRow key={item.id}>
-                <TableCell className="text-left">
-                  <div className="text-left flex gap-3">
-                    <Image
-                      src={item.front_photo_url || "/placeholder.svg"}
-                      width={80}
-                      height={80}
-                      className="rounded-md object-cover"
-                    />
-                    <div>
-                      <div className="text-sm font-bold text-gray-900 dark:text-foreground">
-                        {item.model}
-                      </div>
-                      <div className="text-sm font-normal text-gray-900 dark:text-foreground">
-                        {item.plate_number}
-                      </div>
-                      <div className="text-sm font-normal text-gray-900 dark:text-foreground">
-                        {item.year}
-                      </div>
-                      <div className="text-sm font-normal text-gray-900 dark:text-foreground">
-                        {item.color}
-                      </div>
-                      <div className="text-sm font-normal text-gray-900 dark:text-foreground">
-                        {item.location}
-                      </div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-left">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>{item.vehicle_type}</span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-left">
-                  {(() => {
-                    switch (item.status) {
-                      case "Available":
-                        return (
-                          <Badge className="bg-green-100 text-green-700">
-                            Available
-                          </Badge>
-                        );
-                      case "Rented":
-                        return (
-                          <Badge className="bg-blue-100 text-blue-700">
-                            Rented
-                          </Badge>
-                        );
-                      case "Maintenance":
-                        return (
-                          <Badge className="bg-yellow-100 text-yellow-700">
-                            Maintenance
-                          </Badge>
-                        );
-                      case "Out Of Service":
-                        return (
-                          <Badge className="bg-red-100 text-red-700">
-                            Out Of Service
-                          </Badge>
-                        );
+                <TableCell className='text-left'><div className="text-left flex gap-3">
+    <Image src={item.front_photo_url || '/placeholder.svg'} width={80} height={80} className='rounded-md object-cover' />
+    <div>
+        <div className='text-sm font-semibold text-gray-900 dark:text-foreground'>{item.model}</div>
+<div className='text-sm font-normal text-gray-900 dark:text-foreground'>{item.plate_number}</div>
+<div className='text-sm font-normal text-gray-900 dark:text-foreground'>{item.year}</div>
+<div className='text-sm font-normal text-gray-900 dark:text-foreground'>{item.color}</div>
+<div className='text-sm font-normal text-gray-900 dark:text-foreground'>{item.location}</div>
 
-                      default:
-                        return item.status;
-                    }
-                  })()}
-                </TableCell>
-                <TableCell className="text-left">
-                  <div className="font-bold text-blue-600">
-                    Rp {formatRupiah(item.daily_rate)}
-                  </div>
-                </TableCell>
+    </div>
+</div></TableCell>
+<TableCell className='text-left'><div className="flex items-center gap-2">
+<MapPin className="h-4 w-4 text-muted-foreground" />
+<span>{item.vehicle_type}</span>
+</div></TableCell>
+<TableCell className='text-left'>{(() => {
+    switch (item.status) {
+        case 'Available': return <Badge className='bg-green-100 text-green-700'>Available</Badge>;
+case 'Rented': return <Badge className='bg-blue-100 text-blue-700'>Rented</Badge>;
+case 'Maintenance': return <Badge className='bg-yellow-100 text-yellow-700'>Maintenance</Badge>;
+case 'Out Of Service': return <Badge className='bg-red-100 text-red-700'>Out Of Service</Badge>;
+
+        default: return item.status;
+    }
+})()}</TableCell>
+<TableCell className='text-left'><div className='font-bold text-blue-600'>Rp {formatRupiah(item.daily_rate)}/day</div>
+</TableCell>
 
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {/* show */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleView(item.id)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => handleView(item.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
 
@@ -449,21 +475,18 @@ export function VehicleTable({
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Batal</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            Hapus
-                          </AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDelete(item.id)}>Hapus</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )) }
           </TableBody>
         </Table>
       </CardContent>
     </Card>
-  );
+  )
 }
+

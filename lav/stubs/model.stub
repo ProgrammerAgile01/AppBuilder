@@ -12,6 +12,8 @@ class {{MODEL_NAME}} extends Model
     ];
 
     {{IMAGEAPPEND}}
+
+    {{CASTS}}
     
     {{RELATIONS}}
 

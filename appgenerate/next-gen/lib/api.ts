@@ -378,3 +378,166 @@ export async function syncAccessControlMatrix(
   if (!res.ok) return parseError(res);
   return await res.json();
 }
+
+/* ========== Export Excel (Backend) ========== */
+
+export type ExportExcelParams = {
+  // metadata tanda tangan & header
+  city?: string;
+  approved_by_name?: string;
+  approved_by_title?: string;
+  approved_date?: string; // format bebas, contoh: "16/08/2025"
+
+  // filter opsional (sesuaikan dengan controllermu)
+  search?: string;
+  status?: string;
+
+  // kalau pakai auth cookie/session, set true agar kirim credentials
+  withCredentials?: boolean;
+};
+
+/** Utility: bikin query string tapi skip undefined/null */
+function toQuery(params: Record<string, any> = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    qs.append(k, String(v));
+  });
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+/**
+ * Ambil file Excel sebagai Blob dari backend.
+ * Contoh pakai:
+ *   const blob = await exportExcel('vehicles', { city: 'Jakarta' });
+ */
+export async function exportExcel(
+  entityPlural: string,
+  params: ExportExcelParams = {}
+): Promise<Blob> {
+  const { withCredentials, ...rest } = params;
+  const url = `${API_URL}/${entityPlural}/export-excel${toQuery(rest)}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    },
+    credentials: withCredentials ? "include" : "same-origin",
+  });
+
+  if (!res.ok) return parseError(res);
+  return await res.blob();
+}
+
+/**
+ * Shortcut: langsung download ke file .xlsx
+ * Contoh pakai:
+ *   await downloadExcel('vehicles', { city: 'Jakarta' }, 'Vehicles_Export.xlsx');
+ */
+export async function downloadExcel(
+  entityPlural: string,
+  params: ExportExcelParams = {},
+  filename?: string
+) {
+  const blob = await exportExcel(entityPlural, params);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download =
+    filename ||
+    `${entityPlural.replace(/-/g, "_")}_${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, "")}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** (opsional) hanya membentuk URL jika kamu butuh dipakai di <a href> */
+export function getExportExcelUrl(
+  entityPlural: string,
+  params: ExportExcelParams = {}
+) {
+  return `${API_URL}/${entityPlural}/export-excel${toQuery(params)}`;
+}
+
+/* ========== Export PDF ========== */
+
+export type ExportPdfParams = {
+  // metadata tanda tangan & header
+  approver_name?: string;
+  approver_title?: string;
+  approver_date?: string;
+  place?: string;    
+
+  // filter opsional (sesuaikan dengan controller
+  search?: string;
+  status?: string;
+  columns?: string; // contoh: "plate_number,brand,year"
+
+  limit?: number;
+
+  // kalau pakai auth cookie/session, set true agar kirim credentials
+  withCredentials?: boolean;
+};
+
+export async function exportPdf(
+  entityPlural: string,
+  params: ExportPdfParams = {}
+): Promise<Blob> {
+  const { withCredentials, ...rest } = params;
+  const qs = new URLSearchParams();
+  Object.entries(rest).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    qs.append(k, String(v));
+  });
+
+  const url = `${API_URL}/${entityPlural}/export-pdf${qs.toString() ? `?${qs.toString()}` : ""}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Accept: "application/pdf",
+    },
+    credentials: withCredentials ? "include" : "same-origin",
+  });
+
+  if (!res.ok) return parseError(res);
+  return await res.blob();
+}
+
+/** Shortcut: langsung download ke file .pdf */
+export async function downloadPdf(
+  entityPlural: string,
+  params: ExportPdfParams = {},
+  filename?: string
+) {
+  const blob = await exportPdf(entityPlural, params);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download =
+    filename ||
+    `${entityPlural.replace(/-/g, "_")}_${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, "")}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** (opsional) hanya membentuk URL jika mau dipakai di <a href> */
+export function getExportPdfUrl(
+  entityPlural: string,
+  params: ExportPdfParams = {}
+) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    qs.append(k, String(v));
+  });
+  return `${API_URL}/pdf/${entityPlural}${qs.toString() ? `?${qs.toString()}` : ""}`;
+}

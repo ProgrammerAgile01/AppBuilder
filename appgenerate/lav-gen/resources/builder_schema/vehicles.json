@@ -1,0 +1,51 @@
+{
+    "title": "Vehicle Management",
+    "menu_title": "Vehicle Management",
+    "table": "vehicles",
+    "columns": [
+        {
+            "source": "model",
+            "label": "Model",
+            "display": "text"
+        },
+        {
+            "source": "plate_number",
+            "label": "Plate Number",
+            "display": "text"
+        },
+        {
+            "source": "year",
+            "label": "Year",
+            "display": "text"
+        },
+        {
+            "source": "color",
+            "label": "Color",
+            "display": "text"
+        },
+        {
+            "source": "location",
+            "label": "Location",
+            "display": "text"
+        },
+        {
+            "source": "vehicle_type",
+            "label": "Vehicle Type",
+            "display": "icon_text"
+        },
+        {
+            "source": "status",
+            "label": "Status",
+            "display": "badge"
+        },
+        {
+            "source": "daily_rate",
+            "label": "Daily Rate",
+            "display": "currency"
+        }
+    ],
+    "summary": {
+        "group_by": "status",
+        "sum": []
+    }
+}

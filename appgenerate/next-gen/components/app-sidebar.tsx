@@ -92,7 +92,7 @@ const menuItems = [
     activeBorder: "border-emerald-400 dark:border-emerald-600",
     count: 18,
     items: [
-      { icon: Car, labelKey: "vehicleManagement" as const, href: "/vehicles" },
+      { icon: Car, labelKey: "vehicleManagement" as const, href: "/vehicle" },
       { icon: Calendar, labelKey: "maintenanceSchedule" as const, href: "/maintenance/schedule" },
       { icon: History, labelKey: "maintenanceHistory" as const, href: "/maintenance/history" },
       { icon: UserCheck, labelKey: "driverCrew" as const, href: "/drivers" },
