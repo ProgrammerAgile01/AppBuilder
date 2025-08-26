@@ -36,7 +36,7 @@ export async function fetchData(entity: string) {
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     createdBy: item.created_by ?? "Unknown",
-    moduleGroup: item.module_group ?? item.modules?.name ?? "",
+    product: item.product ?? "",
   }));
 }
 
@@ -119,7 +119,7 @@ export async function getDataById(entity: string, id: string) {
     created_at: item.created_at,
     updated_at: item.updated_at,
     created_by: item.created_by,
-    modules_id: String(item.modules_id),
+    product_id: String(item.product_id),
     menuIcon: item.menu_icon,
 
     // penting utk parent page
@@ -129,7 +129,7 @@ export async function getDataById(entity: string, id: string) {
     // lempar mentah ke parent (biar parent translate source_column -> columnId)
     table_layout: item.table_layout ?? null,
     field_categories: item.field_categories ?? null,
-    card_layout: item.card_layout
+    card_layout: item.card_layout,
   };
 }
 
@@ -310,6 +310,21 @@ export async function fetchOptions(entity: string) {
     label: item.name || item.menu_title || item.label || item.value,
   }));
 }
+
+export async function fetchProductsOnBuilder(path: string) {
+  const res = await fetch(`http://localhost:8080/api/${path}`);
+  const json = await res.json();
+
+  const arr: any[] = Array.isArray(json?.data) ? json.data : [];
+
+  return arr.map((item: any) => ({
+    value: String(item.id),                 // UUID
+    label: String(item.product_name ?? ""), // pakai product_name
+    code : item.product_code ?? null,       // opsional, kalau mau dipakai
+    status: item.status ?? null,
+  }));
+}
+
 export async function generate(entity: string, id: string) {
   const res = await fetch(`${API_URL}/${entity}/generate/${id}`, {
     method: "POST",
@@ -325,8 +340,6 @@ export async function generate(entity: string, id: string) {
 
   return res.json();
 }
-
-
 
 export async function deletedBuilder(entity: string) {
   const res = await fetch(`${API_URL}/${entity}-deleted`, {
@@ -511,4 +524,889 @@ export async function generateFrontendMenu(opts?: {
     throw new Error(txt || "Gagal generate sidebar");
   }
   return res.json().catch(() => ({}));
+}
+
+// =================== PACKAGES (Package Builder) ===================
+
+export interface FeatureDTO {
+  id: string;
+  name: string;
+  type: "boolean" | "number" | "text";
+  value: boolean | number | string;
+  description: string;
+}
+
+export interface MenuAccessDTO {
+  id: string;
+  name: string;
+  enabled: boolean;
+  children?: MenuAccessDTO[];
+}
+
+export interface PackageDTO {
+  id: string;
+  menu_id?: string | null;
+  parent_id?: string | null;
+
+  name: string;
+  description: string;
+  price: number;
+  maxUsers: number; // maps to max_users
+  status: "active" | "inactive" | "draft";
+  subscribers: number;
+
+  features: FeatureDTO[];
+  menuAccess: MenuAccessDTO[];
+
+  createdAt: string;
+}
+
+// =================== PACKAGE BUILDER – HELPERS ===================
+
+/** Flatten tree menuAccess -> array of enabled menu IDs */
+function collectEnabledMenuIds(nodes: MenuAccessDTO[]): number[] {
+  const ids: number[] = [];
+  const walk = (arr: MenuAccessDTO[]) => {
+    arr.forEach((n) => {
+      if (n.enabled) ids.push(Number(n.id));
+      if (n.children?.length) walk(n.children);
+    });
+  };
+  walk(nodes || []);
+  return Array.from(new Set(ids)).map((x) => Number(x));
+}
+
+/** Map raw API -> DTO FE (server sudah kirim menuAccess tree) */
+function mapApiToPackageDTO(item: any): PackageDTO {
+  return {
+    id: String(item.id),
+    menu_id: item.menu_id ? String(item.menu_id) : null,
+    parent_id: item.parent_id ? String(item.parent_id) : null,
+
+    name: item.name ?? "",
+    description: item.description ?? "",
+    price: Number(item.price ?? 0),
+    maxUsers: Number(item.maxUsers ?? item.max_users ?? 1),
+    status: (item.status ?? "draft") as PackageDTO["status"],
+    subscribers: Number(item.subscribers ?? 0),
+
+    features: Array.isArray(item.features) ? item.features : [],
+    menuAccess: Array.isArray(item.menuAccess) ? item.menuAccess : [],
+
+    createdAt: item.createdAt ?? item.created_at ?? "",
+  };
+}
+
+/** Normalisasi DTO -> payload API */
+function toApiPayloadFromDTO(data: PackageDTO) {
+  const menu_access = collectEnabledMenuIds(data.menuAccess || []);
+  return {
+    menu_id: data.menu_id ?? null,
+    parent_id: data.parent_id ?? null,
+
+    name: data.name,
+    description: data.description,
+    price: data.price,
+    max_users: data.maxUsers,
+    status: data.status,
+    subscribers: data.subscribers ?? 0,
+
+    features: data.features ?? [],
+    menu_access, // kirim array of menu IDs
+  };
+}
+
+/** Helper: tarik pesan error yang manusiawi dari response */
+async function toReadableApiError(res: Response): Promise<Error> {
+  let msg = `HTTP ${res.status}`;
+  try {
+    const txt = await res.text();
+    try {
+      const json = JSON.parse(txt);
+      msg = json?.message || txt || msg;
+    } catch {
+      msg = txt || msg;
+    }
+  } catch {}
+  return new Error(msg);
+}
+
+// =================== PACKAGE BUILDER – HTTP FUNCS ===================
+
+/** LIST (GET /api/package) – route singular sesuai apiResource('package', ...) */
+export async function fetchPackages(params?: {
+  menu_id?: string;
+  root_only?: boolean;
+  with_trashed?: boolean;
+  only_trashed?: boolean;
+}): Promise<PackageDTO[]> {
+  const url = new URL(`${API_URL}/package`);
+  if (params?.menu_id) url.searchParams.set("menu_id", params.menu_id);
+  if (params?.root_only) url.searchParams.set("root_only", "1");
+  if (params?.with_trashed) url.searchParams.set("with_trashed", "1");
+  if (params?.only_trashed) url.searchParams.set("only_trashed", "1");
+
+  const res = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok)
+    throw new Error(
+      `Gagal mengambil packages: ${res.status} ${await res.text()}`
+    );
+
+  const json = await res.json();
+  const arr = Array.isArray(json?.data)
+    ? json.data
+    : Array.isArray(json)
+    ? json
+    : [];
+  return arr.map(mapApiToPackageDTO);
+}
+
+/** SHOW (GET /api/package/{id}) */
+export async function getPackageById(id: string): Promise<PackageDTO> {
+  const res = await fetch(`${API_URL}/package/${id}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const json = await res.json();
+  return mapApiToPackageDTO(json.data ?? json);
+}
+
+/** CREATE (POST /api/package) */
+export async function createPackage(data: PackageDTO): Promise<PackageDTO> {
+  const payload = toApiPayloadFromDTO(data);
+  const res = await fetch(`${API_URL}/package`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await toReadableApiError(res);
+  const json = await res.json();
+  return mapApiToPackageDTO(json.data ?? json);
+}
+
+/** UPDATE (PUT /api/package/{id}) */
+export async function updatePackage(
+  id: string,
+  data: PackageDTO
+): Promise<PackageDTO> {
+  const payload = toApiPayloadFromDTO(data);
+  const res = await fetch(`${API_URL}/package/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw await toReadableApiError(res);
+  const json = await res.json();
+  return mapApiToPackageDTO(json.data ?? json);
+}
+
+/** DELETE (DELETE /api/package/{id}) */
+export async function deletePackage(id: string) {
+  const res = await fetch(`${API_URL}/package/${id}`, { method: "DELETE" });
+  if (!res.ok) throw await toReadableApiError(res);
+}
+
+/** RESTORE (POST /api/packages/{id}/restore) – ops plural sesuai routes kamu */
+export async function restorePackage(id: string): Promise<PackageDTO> {
+  const res = await fetch(`${API_URL}/packages/${id}/restore`, {
+    method: "POST",
+  });
+  if (!res.ok) throw await toReadableApiError(res);
+  const json = await res.json();
+  return mapApiToPackageDTO(json.data ?? json);
+}
+
+/** FORCE DELETE (DELETE /api/packages/{id}/force) – ops plural sesuai routes kamu */
+export async function forceDeletePackage(id: string) {
+  const res = await fetch(`${API_URL}/packages/${id}/force`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw await toReadableApiError(res);
+}
+
+// =================== MENU ACCESS TREE (ambil dari tabel menus) ===================
+
+/**
+ * Ambil tree menu dari backend dan map ke shape UI {id,name,enabled,children}.
+ * Dukung berbagai nama field anak: children | recursiveChildren | recursive_children | items
+ * dan berbagai nama judul: title | name | menu_title | menuTitle
+ *
+ * NOTE: fungsi ini mengandalkan fetchMenusTreeWithTrashed() yang sudah ada di file ini.
+ */
+export async function fetchMenuAccessTree(): Promise<MenuAccessDTO[]> {
+  const raw = await fetchMenusTreeWithTrashed(); // harus mengembalikan root + children
+
+  const getChildren = (n: any): any[] =>
+    (n?.children ??
+      n?.recursiveChildren ??
+      n?.recursive_children ??
+      n?.items ??
+      []) ||
+    [];
+
+  const getName = (n: any): string =>
+    String(n?.title ?? n?.name ?? n?.menu_title ?? n?.menuTitle ?? "");
+
+  const mapNode = (n: any): MenuAccessDTO => ({
+    id: String(n?.id),
+    name: getName(n),
+    enabled: false,
+    children: getChildren(n).map(mapNode),
+  });
+
+  const roots: any[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as any)?.data)
+    ? (raw as any).data
+    : [];
+  return roots.map(mapNode);
+}
+
+// ====== FEATURE BUILDER + MENUS (Relasi langsung ke `menus`) ======
+export type FeatureType = "category" | "feature" | "subfeature";
+
+export interface FeatureTreeNode {
+  id: string;
+
+  // UI lama masih membaca "code", backend pakai "feature_code"
+  code: string;
+  feature_code?: string;
+
+  name: string;
+  description: string | null;
+  type: FeatureType;
+
+  // relasi & meta (snake_case)
+  parent_id: string | null;
+  is_active: boolean;
+  order_number?: number | null;
+  crud_menu_id?: string | null;
+  product_id?: string | null;
+  product_code?: string | null;
+
+  // opsi parent
+  price_addon?: number | null;
+  trial_available?: boolean | null;
+  trial_days?: number | null;
+
+  // timestamps
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+
+  // (opsional, kalau backend kirim tree)
+  children?: FeatureTreeNode[];
+  recursiveChildren?: FeatureTreeNode[];
+}
+
+type _Raw = Record<string, any>;
+
+function _bool(v: any, d = false) {
+  if (v === true || v === "1" || v === 1) return true;
+  if (v === false || v === "0" || v === 0) return false;
+  return d;
+}
+function _num(v: any, d = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : d;
+}
+
+function _mapNode(raw: _Raw): FeatureTreeNode {
+  const parent_id =
+    raw.parent_id != null
+      ? String(raw.parent_id)
+      : raw.parentId != null
+      ? String(raw.parentId)
+      : null;
+
+  const order_number =
+    raw.order_number != null ? _num(raw.order_number) : _num(raw.orderNumber);
+
+  const is_active =
+    raw.is_active != null ? _bool(raw.is_active) : _bool(raw.isActive, true);
+
+  const crud_menu_id =
+    raw.crud_menu_id != null
+      ? String(raw.crud_menu_id)
+      : raw.menu_id != null
+      ? String(raw.menu_id)
+      : null;
+
+  const node: FeatureTreeNode = {
+    id: String(raw.id),
+    name: String(raw.name ?? ""),
+    code: String(raw.feature_code ?? raw.code ?? ""),
+    feature_code: String(raw.feature_code ?? raw.code ?? ""),
+    description: raw.description ?? null,
+    type: (raw.type ?? "feature") as FeatureType,
+
+    parent_id,
+    is_active,
+    order_number,
+
+    crud_menu_id,
+    product_id: raw.product_id != null ? String(raw.product_id) : null,
+    product_code: raw.product_code != null ? String(raw.product_code) : null,
+
+    price_addon:
+      raw.price_addon != null ? _num(raw.price_addon) : (null as number | null),
+    trial_available:
+      raw.trial_available != null ? _bool(raw.trial_available) : null,
+    trial_days:
+      raw.trial_days != null ? _num(raw.trial_days) : (null as number | null),
+
+    created_at: raw.created_at,
+    updated_at: raw.updated_at,
+    deleted_at: raw.deleted_at ?? null,
+  };
+
+  // ikutkan anak kalau backend kirim
+  if (Array.isArray(raw.children)) node.children = raw.children.map(_mapNode);
+  if (Array.isArray(raw.recursiveChildren))
+    node.recursiveChildren = raw.recursiveChildren.map(_mapNode);
+
+  return node;
+}
+
+function _extractArray(json: any): any[] {
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) return json.data;
+  if (Array.isArray(json?.data?.data)) return json.data.data;
+  if (Array.isArray(json?.rows)) return json.rows;
+  return [];
+}
+
+// ===== Error helper agar 422 Laravel kebaca jelas =====
+async function _throwIfNotOk(res: Response) {
+  if (res.ok) return;
+  try {
+    const j = await res.json();
+    if (j?.errors) {
+      const msg = Object.entries(j.errors)
+        .map(([f, arr]) => `${f}: ${(arr as any[]).join(", ")}`)
+        .join("\n");
+      throw new Error(msg || j.message || `${res.status} ${res.statusText}`);
+    }
+    throw new Error(j?.message || `${res.status} ${res.statusText}`);
+  } catch {
+    throw new Error(await res.text());
+  }
+}
+
+// helper: camelCase -> snake_case utk Laravel (normalisasi lengkap)
+function toSnakePayload(input: Record<string, any>) {
+  const out: Record<string, any> = {};
+
+  const toNullIfEmptyId = (val: any) =>
+    val === "" || val === undefined ? null : val;
+
+  const toNumberIfNumeric = (val: any) =>
+    typeof val === "string" && /^\d+$/.test(val) ? Number(val) : val;
+
+  for (const [k, vRaw] of Object.entries(input)) {
+    let v = vRaw;
+
+    switch (k) {
+      // alias camel yang sering muncul
+      case "parentId":
+        v = toNullIfEmptyId(v);
+        out["parent_id"] = toNumberIfNumeric(v);
+        break;
+      case "productId":
+        v = toNullIfEmptyId(v);
+        out["product_id"] = toNumberIfNumeric(v);
+        break;
+      case "productCode":
+        out["product_code"] = v ?? null;
+        break;
+      case "featureCode":
+        out["feature_code"] = v;
+        break;
+      case "crudMenuId":
+        v = toNullIfEmptyId(v);
+        out["crud_menu_id"] = toNumberIfNumeric(v);
+        break;
+      case "isActive":
+        out["is_active"] = !!v;
+        break;
+      case "orderNumber":
+      case "order":
+        out["order_number"] = v ?? 0;
+        break;
+
+      // snake-case yang sudah benar
+      case "parent_id":
+      case "product_id":
+      case "product_code":
+      case "feature_code":
+      case "crud_menu_id":
+      case "is_active":
+      case "order_number":
+        out[k] = k.endsWith("_id") ? toNumberIfNumeric(toNullIfEmptyId(v)) : v;
+        break;
+
+      case "trial_available":
+        out[k] = !!v;
+        break;
+
+      case "trial_days":
+        // kalau trial_available false -> kirim null
+        out[k] = input["trial_available"] ? v ?? null : null;
+        break;
+
+      default:
+        out[k] = v;
+    }
+  }
+  return out;
+}
+
+/** Ambil full tree root -> children (GET /api/fitur/tree) */
+export async function fetchFiturTree(params?: {
+  trash?: "with" | "only";
+  product_id?: string;
+}) {
+  const url = new URL(`${API_URL}/fitur/tree`);
+  if (params?.trash) url.searchParams.set("trash", params.trash);
+  if (params?.product_id) url.searchParams.set("product_id", params.product_id);
+  url.searchParams.set("root_only", "1");
+  url.searchParams.set("with_tree", "1");
+
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  await _throwIfNotOk(res);
+
+  const json = await res.json();
+  return _extractArray(json).map(_mapNode) as FeatureTreeNode[];
+}
+
+/** List fitur (GET /api/fitur) – default root_only=1, with_tree=1 */
+export async function listFitur(params?: {
+  search?: string;
+  type?: FeatureType;
+  root_only?: boolean;
+  parent_id?: string;
+  with_tree?: boolean;
+  trash?: "with" | "only";
+  product_id?: string;
+}): Promise<FeatureTreeNode[]> {
+  const url = new URL(`${API_URL}/fitur`);
+  if (params?.search) url.searchParams.set("search", params.search);
+  if (params?.type) url.searchParams.set("type", params.type);
+  if (params?.parent_id) url.searchParams.set("parent_id", params.parent_id);
+  url.searchParams.set("root_only", params?.root_only ?? true ? "1" : "0");
+  url.searchParams.set("with_tree", params?.with_tree ?? true ? "1" : "0");
+  if (params?.trash) url.searchParams.set("trash", params.trash);
+  if (params?.product_id) url.searchParams.set("product_id", params.product_id);
+
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  await _throwIfNotOk(res);
+
+  const json = await res.json();
+  return _extractArray(json).map(_mapNode);
+}
+
+/** Create fitur (POST /api/fitur) */
+export async function createFitur(payload: {
+  product_id: string | number;
+  product_code?: string | null;
+  name: string;
+  feature_code: string;
+  type: FeatureType;
+  parent_id?: string | number | null;
+  description?: string | null;
+  crud_menu_id?: string | number | null;
+  is_active?: boolean;
+  order_number?: number;
+  price_addon?: number;
+  trial_available?: boolean;
+  trial_days?: number | null;
+}): Promise<FeatureTreeNode> {
+  const body = toSnakePayload(payload as any);
+  const res = await fetch(`${API_URL}/fitur`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  await _throwIfNotOk(res);
+  const json = await res.json();
+  return _mapNode(json.data ?? json);
+}
+
+/** Update fitur (PUT /api/fitur/{id}) */
+export async function updateFitur(
+  id: string | number,
+  payload: {
+    name: string;
+    feature_code: string;
+    type: FeatureType;
+    parent_id?: string | number | null;
+    description?: string | null;
+    crud_menu_id?: string | number | null;
+    is_active?: boolean;
+    order_number?: number;
+    price_addon?: number;
+    trial_available?: boolean;
+    trial_days?: number | null;
+    // ⬇️ ikutkan agar validasi backend tidak 422
+    product_id?: string | number | null;
+    product_code?: string | null;
+  }
+): Promise<FeatureTreeNode> {
+  const body = toSnakePayload(payload as any);
+  const res = await fetch(`${API_URL}/fitur/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  await _throwIfNotOk(res);
+  const json = await res.json();
+  return _mapNode(json.data ?? json);
+}
+
+/** Soft delete (DELETE /api/fitur/{id}) */
+export async function deleteFitur(id: string | number): Promise<void> {
+  const res = await fetch(`${API_URL}/fitur/${id}`, { method: "DELETE" });
+  await _throwIfNotOk(res);
+}
+
+/** Toggle aktif/non (POST /api/fitur/{id}/toggle) */
+export async function toggleFitur(
+  id: string | number
+): Promise<FeatureTreeNode> {
+  const res = await fetch(`${API_URL}/fitur/${id}/toggle`, { method: "POST" });
+  await _throwIfNotOk(res);
+  const json = await res.json();
+  return _mapNode(json.data ?? json);
+}
+
+/** Restore (POST /api/fitur/{id}/restore) */
+export async function restoreFitur(
+  id: string | number
+): Promise<FeatureTreeNode> {
+  const res = await fetch(`${API_URL}/fitur/${id}/restore`, { method: "POST" });
+  await _throwIfNotOk(res);
+  const json = await res.json();
+  return _mapNode(json.data ?? json);
+}
+
+/** Hard delete (DELETE /api/fitur/{id}/force) */
+export async function forceDeleteFitur(id: string | number): Promise<void> {
+  const res = await fetch(`${API_URL}/fitur/${id}/force`, { method: "DELETE" });
+  await _throwIfNotOk(res);
+}
+
+/** Ambil tree fitur yang soft-deleted */
+export async function fetchDeletedFiturTree(productId?: string | number) {
+  const url = new URL(`${API_URL}/fitur/tree`);
+  url.searchParams.set("trash", "only");
+  if (productId) url.searchParams.set("product_id", String(productId));
+  const res = await fetch(url.toString(), { cache: "no-store" });
+  await _throwIfNotOk(res);
+  const json = await res.json();
+  return _extractArray(json).map(_mapNode);
+}
+
+// =================== MENUS LOOKUP (Dropdown relasi langsung ke menus) ===================
+
+export interface CrudMenuOption {
+  id: string; // dipakai sebagai crud_menu_id
+  path: string; // "Group › Module › Menu"
+  label: string; // title
+  status: "active" | "inactive";
+  product_id?: string | null; // bila tersedia dari join crud_builders
+}
+
+// Ambil tree dari /menus
+async function _fetchMenusTree(params?: { trash?: "none" | "with" | "only" }) {
+  const url = new URL(`${API_URL}/menus`);
+  url.searchParams.set("trash", params?.trash ?? "none");
+  const res = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  await _throwIfNotOk(res);
+  const json = await res.json();
+  // controller Anda mengembalikan { data: [...] }
+  return Array.isArray(json?.data)
+    ? json.data
+    : Array.isArray(json)
+    ? json
+    : [];
+}
+
+// Flatten: tampilkan hanya node type "menu" + trail Group/Module/Menu
+function _flattenMenusToOptions(roots: any[]): CrudMenuOption[] {
+  const out: CrudMenuOption[] = [];
+
+  const walk = (node: any, trail: string[]) => {
+    const title = String(node?.title ?? "");
+    const thisTrail = title ? [...trail, title] : trail;
+
+    if ((node?.type ?? "menu") === "menu") {
+      out.push({
+        id: String(node.id),
+        path: thisTrail.join(" › "),
+        label: title,
+        status: node?.is_active ? "active" : "inactive",
+        product_id:
+          node?.crud_builder?.product_id != null
+            ? String(node.crud_builder.product_id)
+            : node?.crudBuilder?.product_id != null
+            ? String(node.crudBuilder.product_id)
+            : null,
+      });
+    }
+
+    const children =
+      node?.recursiveChildren ??
+      node?.recursive_children ??
+      node?.children ??
+      node?.items ??
+      [];
+
+    if (Array.isArray(children)) {
+      for (const ch of children) walk(ch, thisTrail);
+    }
+  };
+
+  for (const r of roots || []) walk(r, []);
+  return out.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+/** Ambil opsi dropdown menu dari /api/menus, dengan filter opsional product_id */
+export async function fetchCrudMenusForProduct(params?: {
+  product_id?: string | number;
+  active_only?: boolean;
+  search?: string;
+}): Promise<CrudMenuOption[]> {
+  const roots = await _fetchMenusTree({ trash: "none" });
+  let options = _flattenMenusToOptions(roots);
+
+  if (params?.active_only !== false) {
+    options = options.filter((m) => m.status === "active");
+  }
+
+  if (params?.product_id) {
+    const pid = String(params.product_id);
+    // kalau product_id tersedia di data, filter; jika semuanya null, jangan kosongkan dropdown
+    const filtered = options.filter(
+      (m) => m.product_id == null || m.product_id === pid
+    );
+    options = filtered.length > 0 ? filtered : options;
+  }
+
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    options = options.filter(
+      (m) =>
+        m.path.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)
+    );
+  }
+
+  return options;
+}
+
+// =============== FEATURE BUILDER (integrasi penuh) ===============
+/** Flatten tree generic -> array of enabled node IDs (string/number) */
+export function flattenEnabledIds(
+  nodes: { id: string | number; enabled?: boolean; children?: any[] }[] = []
+): number[] {
+  const out: number[] = [];
+  const walk = (arr: any[]) => {
+    for (const n of arr || []) {
+      if (n?.enabled) out.push(Number(n.id));
+      if (n?.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  // uniq + to number
+  return Array.from(new Set(out)).map(Number);
+}
+
+/** Apply enabled flags to a base tree using allowed IDs */
+export function markEnabledIds<
+  T extends { id: string | number; enabled?: boolean; children?: T[] }
+>(tree: T[], allowedIds: Array<string | number>): T[] {
+  const allow = new Set(allowedIds.map(Number));
+  const walk = (arr: T[]): T[] =>
+    (arr || []).map((n) => ({
+      ...n,
+      enabled: allow.has(Number(n.id)),
+      children: n.children?.length ? walk(n.children as T[]) : n.children,
+    }));
+  return walk(tree);
+}
+
+/** Baris raw di tabel feature_builders (SETIAP baris = 1 mapping) */
+export interface FeatureBuilderRow {
+  id: string;
+  package_id: number;
+  menu_id: number | null;
+  feature_id: number | null;
+  status: "active" | "draft" | "archived";
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Hasil agregasi untuk 1 paket: kumpulan id menu & fitur */
+export interface FeatureBuilderSelection {
+  packageId: number;
+  menuIds: number[];
+  featureIds: number[];
+}
+
+/** GET semua baris feature_builder untuk suatu package_id, lalu agregasi jadi {menuIds, featureIds} */
+export async function fetchFeatureBuilderSelection(
+  packageId: string | number
+): Promise<FeatureBuilderSelection> {
+  const url = new URL(`${API_URL}/feature-builders`);
+  url.searchParams.set("package_id", String(packageId));
+
+  const res = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw await toReadableApiError(res);
+  const json = await res.json();
+
+  const rows: FeatureBuilderRow[] = Array.isArray(json?.data)
+    ? json.data
+    : Array.isArray(json)
+    ? json
+    : [];
+
+  const menuIds = new Set<number>();
+  const featureIds = new Set<number>();
+  for (const r of rows) {
+    if (r?.menu_id != null) menuIds.add(Number(r.menu_id));
+    if (r?.feature_id != null) featureIds.add(Number(r.feature_id));
+  }
+
+  return {
+    packageId: Number(packageId),
+    menuIds: Array.from(menuIds),
+    featureIds: Array.from(featureIds),
+  };
+}
+
+/**
+ * SAVE pilihan ke backend (bulk):
+ * Backend-mu sudah kita buat menerima:
+ *  - POST /feature-builders  { package_id, menu_ids: number[], feature_ids: number[] }
+ * Kontroler akan meng-*insert or ignore* baris per id.
+ */
+export async function saveFeatureBuilderSelection(payload: {
+  package_id: number | string;
+  menu_ids: number[];
+  feature_ids: number[];
+  status?: "active" | "draft" | "archived";
+}) {
+  const res = await fetch(`${API_URL}/feature-builders`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      package_id: Number(payload.package_id),
+      menu_ids: Array.from(new Set(payload.menu_ids.map(Number))),
+      feature_ids: Array.from(new Set(payload.feature_ids.map(Number))),
+      status: payload.status ?? "active",
+    }),
+  });
+
+  if (!res.ok) throw await toReadableApiError(res);
+  return res.json(); // { success: true, data: rows[] }
+}
+
+/**
+ * HELPER: sinkronkan UI tree (menu & fitur) berdasarkan data tersimpan di DB untuk package tertentu
+ * - menuTree: tree dari fetchMenuAccessTree()
+ * - featureTree: tree dari fetchFiturTree() atau yang sudah kamu punya di state
+ */
+export async function hydrateFeatureBuilderTreesForPackage(
+  packageId: string | number,
+  menuTree: MenuAccessDTO[],
+  featureTree: any[] // bentuk tree fitur kamu (punya field id, enabled, children)
+) {
+  const { menuIds, featureIds } = await fetchFeatureBuilderSelection(packageId);
+  return {
+    menuTree: markEnabledIds(menuTree, menuIds),
+    featureTree: markEnabledIds(featureTree, featureIds),
+  };
+}
+
+/** CONVENIENCE: ambil -> enable -> kembalikan hanya daftar id (kalau kamu ingin one-shot save) */
+export function collectSelectionFromTrees(
+  menuTree: MenuAccessDTO[],
+  featureTree: any[]
+) {
+  return {
+    menu_ids: flattenEnabledIds(menuTree),
+    feature_ids: flattenEnabledIds(featureTree),
+  };
+}
+// === PRODUCTS with trash support ===
+
+// List products, dukung opsi trash= "none" | "with" | "only"
+export async function fetchProducts(opts?: {
+  search?: string;
+  status?: "active" | "inactive" | "archived";
+  trash?: "none" | "with" | "only";
+}) {
+  const url = new URL(`${API_URL}/products`);
+  if (opts?.search) url.searchParams.set("search", opts.search);
+  if (opts?.status) url.searchParams.set("status", opts.status);
+  if (opts?.trash && opts.trash !== "none")
+    url.searchParams.set("trash", opts.trash);
+
+  const res = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Gagal mengambil products: ${res.status} ${txt}`);
+  }
+  const json = await res.json().catch(() => ({}));
+  // Kembalikan array polos + meta jika ada
+  return {
+    data: Array.isArray(json?.data)
+      ? json.data
+      : Array.isArray(json)
+      ? json
+      : [],
+    meta: json?.meta || {},
+  };
+}
+
+// Soft delete sudah otomatis via deleteData("products", id)
+
+export async function restoreProduct(id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/products/${id}/restore`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    let msg = await res.text().catch(() => "");
+    try {
+      const j = JSON.parse(msg);
+      msg = j.message || msg;
+    } catch {}
+    throw new Error(msg || "Gagal memulihkan product");
+  }
+}
+
+export async function forceDeleteProduct(id: string): Promise<void> {
+  const res = await fetch(`${API_URL}/products/${id}/force`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let msg = await res.text().catch(() => "");
+    try {
+      const j = JSON.parse(msg);
+      msg = j.message || msg;
+    } catch {}
+    throw new Error(msg || "Gagal menghapus permanen product");
+  }
 }

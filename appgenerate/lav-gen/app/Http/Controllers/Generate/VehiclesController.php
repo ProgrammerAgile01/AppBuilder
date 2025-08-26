@@ -51,7 +51,7 @@ class VehiclesController extends Controller
             'daily_rate' => 'required|numeric',
             'location' => 'required',
             'status' => 'required|in:Available,Rented,Maintenance,Out Of Service',
-            'features' => 'required|array',
+            'features' => 'nullable|array',
             'front_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'side_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
             'back_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
@@ -110,10 +110,10 @@ class VehiclesController extends Controller
             'daily_rate' => 'required|numeric',
             'location' => 'required',
             'status' => 'required|in:Available,Rented,Maintenance,Out Of Service',
-            'features' => 'required|array',
-            'front_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
-            'side_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
-            'back_photo' => 'required|image|max:5120|mimes:jpg,jpeg,png,webp',
+            'features' => 'nullable|array',
+            'front_photo' => 'nullable|image|max:5120|mimes:jpg,jpeg,png,webp',
+            'side_photo' => 'nullable|image|max:5120|mimes:jpg,jpeg,png,webp',
+            'back_photo' => 'nullable|image|max:5120|mimes:jpg,jpeg,png,webp',
             'description' => 'required',
         ]);
 

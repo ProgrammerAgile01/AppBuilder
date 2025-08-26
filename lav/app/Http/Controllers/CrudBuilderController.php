@@ -20,7 +20,7 @@ class CrudBuilderController extends Controller
     public function index()
     {
         try {
-            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
+            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
 
             return response()->json([
                 'success' => true,
@@ -51,7 +51,7 @@ class CrudBuilderController extends Controller
         // 1. Validasi awal
         try {
             $validated = $request->validate([
-                // 'modules_id' => 'required|exists:modules,id',
+                'product_id' => 'nullable|uuid|exists:mst_products,id',
                 'kategori_crud' => 'required|in:utama,pendukung',
                 'judul' => 'required|string',
                 'nama_tabel' => 'required|string|unique:crud_builders,nama_tabel',
@@ -154,7 +154,7 @@ class CrudBuilderController extends Controller
         try {
             // 2. Simpan Master Builder
             $builder = CrudBuilder::create($request->only([
-                // 'modules_id',
+                'product_id',
                 'kategori_crud',
                 'judul',
                 'judul_en',
@@ -242,7 +242,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil membuat builder',
-                'data' => $builder->load('fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -269,7 +269,7 @@ class CrudBuilderController extends Controller
     public function show($id)
     {
         try {
-            $builder = CrudBuilder::withCount('fields')->with(['fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::withCount('fields')->with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -300,7 +300,7 @@ class CrudBuilderController extends Controller
         // 1) VALIDASI
         try {
             $validated = $request->validate([
-                // 'modules_id' => 'required|exists:modules,id',
+                'product_id' => 'nullable|uuid|exists:mst_products,id',
                 'kategori_crud' => 'required|in:utama,pendukung',
                 'judul' => 'required|string',
                 'nama_tabel' => 'required|string|unique:crud_builders,nama_tabel,' . $id,
@@ -406,11 +406,11 @@ class CrudBuilderController extends Controller
         DB::beginTransaction();
         try {
             // 2) AMBIL BUILDER
-            $builder = CrudBuilder::with(['fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             // 3) UPDATE MASTER BUILDER
             $builder->update($request->only([
-                // 'modules_id',
+                'product_id',
                 'kategori_crud',
                 'judul',
                 'judul_en',
@@ -530,7 +530,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil memperbarui builder',
-                'data' => $builder->load('fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -572,7 +572,7 @@ class CrudBuilderController extends Controller
 
     public function deletedBuilder()
     {
-        $builder = CrudBuilder::onlyTrashed()->with(['fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
+        $builder = CrudBuilder::onlyTrashed()->with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
 
         $totalBuilderDihapus = CrudBuilder::onlyTrashed()->count();
 

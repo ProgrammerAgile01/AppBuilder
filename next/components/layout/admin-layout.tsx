@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +17,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Menu,
   Home,
@@ -35,94 +40,109 @@ import {
   ChevronLeft,
   ChevronRight,
   Navigation,
-} from "lucide-react"
+  LayoutDashboard,
+  Package,
+  Wrench,
+  PanelsTopLeft,
+  Sparkles,
+  Zap,
+  FileText,
+} from "lucide-react";
 
 const navigation = [
   {
-    name: "Dashboard",
+    title: "Dashboard",
     href: "/admin",
-    icon: Home,
-    description: "Overview dan statistik sistem",
-    current: false,
+    icon: LayoutDashboard,
+    badge: null,
   },
   {
-    name: "CRUD Builder",
+    title: "Product",
+    href: "/admin/product",
+    icon: Package,
+    badge: null,
+  },
+  {
+    title: "CRUD Builder",
     href: "/admin/builder",
-    icon: Code,
-    description: "Buat sistem CRUD kompleks",
-    current: false,
+    icon: Wrench,
+    badge: null,
+  },
+  {
+    title: "Content Builder",
+    href: "/admin/content-builder",
+    icon: PanelsTopLeft,
     badge: "New",
   },
   {
-    name: "Atur Menu",
+    title: "Atur Menu",
     href: "/admin/menu-settings",
     icon: Navigation,
-    description: "Menu management system",
+    badge: null,
+  },
+  {
+    title: "Atur Fitur",
+    href: "/admin/atur-fitur",
+    icon: Sparkles,
+    badge: null,
+  },
+  {
+    title: "Package Builder",
+    href: "/admin/package-builder",
+    icon: Zap,
     badge: "New",
   },
   {
-    name: "Modules",
-    href: "/admin/modules",
-    icon: Layers,
-    description: "Kelola modul CRUD",
-    current: false,
+    title: "Feature Builder",
+    href: "/admin/feature-builder",
+    icon: Settings,
+    badge: "New",
   },
   {
-    name: "Modules Table",
-    href: "/admin/modules-table",
-    icon: Table,
-    description: "Tampilan tabel modul",
-    current: false,
-  },
-  {
-    name: "Database",
+    title: "Database",
     href: "/admin/database",
     icon: Database,
-    description: "Manajemen database",
-    current: false,
+    badge: null,
   },
   {
-    name: "Users",
-    href: "/admin/users",
-    icon: Users,
-    description: "Kelola pengguna sistem",
-    current: false,
+    title: "Modules",
+    href: "/admin/modules",
+    icon: Package,
+    badge: null,
   },
   {
-    name: "Analytics",
-    href: "/admin/analytics",
-    icon: BarChart3,
-    description: "Laporan dan analitik",
-    current: false,
+    title: "Modules Table",
+    href: "/admin/modules-table",
+    icon: Table,
+    badge: null,
   },
   {
-    name: "Settings",
-    href: "/admin/settings",
-    icon: Settings,
-    description: "Pengaturan sistem",
-    current: false,
+    title: "Font Test",
+    href: "/admin/font-test",
+    icon: FileText,
+    badge: null,
   },
-]
+];
 
 const recentModules = [
   { name: "User Management", status: "published", href: "/admin/modules/1" },
   { name: "Product Catalog", status: "draft", href: "/admin/modules/2" },
   { name: "Order System", status: "published", href: "/admin/modules/3" },
-]
+];
 
 interface AdminLayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
-  const pathname = usePathname()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const updatedNavigation = navigation.map((item) => ({
     ...item,
     current: pathname === item.href || pathname.startsWith(item.href + "/"),
-  }))
+  }));
 
   const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex h-full flex-col">
@@ -151,9 +171,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <ScrollArea className="flex-1 px-4 py-6">
         <nav className="space-y-2">
           {updatedNavigation.map((item) => {
-            const Icon = item.icon
+            const Icon = item.icon;
             return (
-              <TooltipProvider key={item.name}>
+              <TooltipProvider key={item.title}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Link
@@ -177,14 +197,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                       {!collapsed && (
                         <div className="flex-1 min-w-0 transition-opacity duration-300">
                           <div className="flex items-center gap-2">
-                            <span className="truncate">{item.name}</span>
+                            <span className="truncate">{item.title}</span>
                             {item.badge && (
-                              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                              <Badge
+                                variant="secondary"
+                                className="text-xs bg-blue-100 text-blue-700"
+                              >
                                 {item.badge}
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500 truncate">{item.description}</p>
+                          {/* <p className="text-xs text-slate-500 truncate">
+                            {item.description}
+                          </p> */}
                         </div>
                       )}
                     </Link>
@@ -192,21 +217,25 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   {collapsed && (
                     <TooltipContent side="right" className="ml-2">
                       <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-xs text-slate-500">{item.description}</p>
+                        <p className="font-medium">{item.title}</p>
+                        {/* <p className="text-xs text-slate-500">
+                          {item.description}
+                        </p> */}
                       </div>
                     </TooltipContent>
                   )}
                 </Tooltip>
               </TooltipProvider>
-            )
+            );
           })}
         </nav>
 
         {/* Recent Modules - Hidden when collapsed */}
         {!collapsed && (
           <div className="mt-8 transition-opacity duration-300">
-            <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Recent Modules</h3>
+            <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+              Recent Modules
+            </h3>
             <div className="space-y-1">
               {recentModules.map((module) => (
                 <Link
@@ -245,7 +274,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               }`}
             >
               <Avatar className="h-8 w-8">
-                <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Admin" />
+                <AvatarImage
+                  src="/placeholder.svg?height=32&width=32"
+                  alt="Admin"
+                />
                 <AvatarFallback className="bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm">
                   AD
                 </AvatarFallback>
@@ -253,7 +285,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               {!collapsed && (
                 <>
                   <div className="flex-1 text-left transition-opacity duration-300">
-                    <p className="text-sm font-medium text-slate-900">Admin User</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      Admin User
+                    </p>
                     <p className="text-xs text-slate-500">admin@example.com</p>
                   </div>
                   <ChevronDown className="h-4 w-4 text-slate-400" />
@@ -281,7 +315,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </DropdownMenu>
       </div>
     </div>
-  )
+  );
 
   return (
     <TooltipProvider>
@@ -301,7 +335,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             className="absolute -right-3 top-6 h-6 w-6 rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50 z-40"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           >
-            {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-3 w-3" />
+            ) : (
+              <ChevronLeft className="h-3 w-3" />
+            )}
           </Button>
         </div>
 
@@ -314,7 +352,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Main Content */}
         <div
-          className={`flex flex-1 flex-col transition-all duration-300 ${sidebarCollapsed ? "lg:pl-20" : "lg:pl-80"}`}
+          className={`flex flex-1 flex-col transition-all duration-300 ${
+            sidebarCollapsed ? "lg:pl-20" : "lg:pl-80"
+          }`}
         >
           {/* Mobile Header */}
           <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-200 bg-white px-4 shadow-sm lg:hidden">
@@ -326,12 +366,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 </Button>
               </SheetTrigger>
             </Sheet>
-            <div className="flex-1 text-sm font-semibold leading-6 text-slate-900">CRUD Builder Admin</div>
+            <div className="flex-1 text-sm font-semibold leading-6 text-slate-900">
+              CRUD Builder Admin
+            </div>
           </div>
 
           {/* Desktop Header with Collapse Button */}
           <div className="hidden lg:flex sticky top-0 z-20 h-16 shrink-0 items-center gap-x-4 border-b border-slate-200 bg-white px-6 shadow-sm">
-            <Button variant="ghost" size="sm" className="p-2" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
               <Menu className="h-5 w-5" />
               <span className="sr-only">Toggle sidebar</span>
             </Button>
@@ -347,5 +394,5 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
     </TooltipProvider>
-  )
+  );
 }

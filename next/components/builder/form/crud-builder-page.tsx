@@ -1503,7 +1503,7 @@ export interface DataMaster {
   namaTabel: string;
   deskripsi: string;
   deskripsiEn: string;
-  moduleGroup: string;
+  product: string;
   menuIcon: string;
   kategoriCrud: "utama" | "pendukung";
 }
@@ -2160,7 +2160,7 @@ export function CrudBuilderPage({ builderId }: CrudBuilderPageProps) {
     namaTabel: "",
     deskripsi: "",
     deskripsiEn: "",
-    moduleGroup: "",
+    product: "",
     menuIcon: "Database",
     kategoriCrud: "utama",
   });
@@ -2222,6 +2222,7 @@ export function CrudBuilderPage({ builderId }: CrudBuilderPageProps) {
         setBuilderData(data);
 
         // Master
+        const pid = data?.product_id ?? data?.product ?? "";
         setDataMaster({
           judul: data.judul,
           judulEn: data.judul_en ?? data.judulEn ?? "",
@@ -2230,7 +2231,7 @@ export function CrudBuilderPage({ builderId }: CrudBuilderPageProps) {
           namaTabel: data.nama_tabel ?? data.namaTabel ?? "",
           deskripsi: data.deskripsi ?? "",
           deskripsiEn: data.deskripsi_en ?? data.deskripsiEn ?? "",
-          moduleGroup: String(data.modules_id ?? data.moduleGroup ?? ""),
+          product: pid ? String(pid) : "",
           menuIcon: data.menu_icon ?? data.menuIcon ?? "Database",
           kategoriCrud:
             (data.kategori_crud as DataMaster["kategoriCrud"]) ?? "utama",
@@ -2556,10 +2557,10 @@ export function CrudBuilderPage({ builderId }: CrudBuilderPageProps) {
       setIsSubmitting(false);
       return;
     }
-    if (!dataMaster.moduleGroup) {
+    if (!dataMaster.product) {
       toast({
         title: "Validation Error",
-        description: "Silakan pilih Module Group terlebih dahulu.",
+        description: "Silakan pilih Product terlebih dahulu.",
         variant: "destructive",
       });
       setIsSubmitting(false);
@@ -2607,7 +2608,7 @@ export function CrudBuilderPage({ builderId }: CrudBuilderPageProps) {
       const { idToName } = buildColumnMaps(categories);
 
       const payload = cleanup({
-        modules_id: dataMaster.moduleGroup,
+        product_id: dataMaster.product,
         kategori_crud: dataMaster.kategoriCrud,
         judul: dataMaster.judul,
         judul_en: dataMaster.judulEn || null,

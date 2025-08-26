@@ -3,6 +3,7 @@
 use App\Http\Controllers\CrudBuilderController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\ModulesController;
+use App\Http\Controllers\ProductController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -38,3 +39,10 @@ Route::post('/generate-menu', [MenuController::class, 'generateMenu']);
 Route::post('menus/reorder', [MenuController::class, 'reorder']);
 Route::patch('menus/{id}/toggle-active', [MenuController::class, 'toggleActive']);
 Route::get('menus/type/{type}', [MenuController::class, 'getByType']);
+
+//Product
+Route::apiResource('products', ProductController::class);
+
+// Tambahan untuk trash
+Route::post('products/{id}/restore', [ProductController::class, 'restore']);
+Route::delete('products/{id}/force', [ProductController::class, 'forceDelete']);
