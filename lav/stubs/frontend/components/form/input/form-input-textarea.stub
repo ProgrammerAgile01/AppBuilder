@@ -1,0 +1,10 @@
+<div className="space-y-1">
+  <Textarea
+    value={formData.{{FIELD}} || ""}
+    onChange={(e) => setFormData((prev) => ({ ...prev, "{{FIELD}}": e.target.value }))}
+    placeholder="{{PLACEHOLDER}}"
+    rows={4}
+    className="text-foreground placeholder:text-muted-foreground"
+    {{REQUIRED}}
+  />
+</div>

@@ -1,0 +1,12 @@
+<div className="space-y-1">
+  <Label htmlFor="{{FIELD}}" className="text-foreground">{{LABEL}}*</Label>
+  <Input
+    type="{{TYPE}}"
+    id="{{FIELD}}"
+    placeholder="{{PLACEHOLDER}}"
+    value={formData.{{FIELD}} || ""}
+    onChange={(e) => setFormData((prev) => ({ ...prev, "{{FIELD}}": e.target.value }))}
+    className="text-foreground placeholder:text-muted-foreground"
+    {{REQUIRED}}
+  />
+</div>

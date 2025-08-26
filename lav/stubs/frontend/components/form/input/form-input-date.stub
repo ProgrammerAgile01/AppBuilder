@@ -1,0 +1,12 @@
+<div className="space-y-1">
+  <Label htmlFor="{{FIELD}}">{{LABEL}}*</Label>
+  <Input
+    type="date"
+    id="{{FIELD}}"
+    value={formData.{{FIELD}} || ""}
+    onChange={(e) =>
+      setFormData((prev) => ({ ...prev, "{{FIELD}}": e.target.value }))
+    }
+    {{REQUIRED}}
+  />
+</div>

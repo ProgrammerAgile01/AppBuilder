@@ -1,0 +1,5 @@
+import { {{ENTITY_PASCAL_SINGULAR}}Page } from "@/components/{{ENTITY_KEBAB_SINGULAR}}/{{ENTITY_KEBAB_SINGULAR}}-page";
+
+export default function {{ENTITY_PASCAL_SINGULAR}}() {
+  return <{{ENTITY_PASCAL_SINGULAR}}Page />;
+}

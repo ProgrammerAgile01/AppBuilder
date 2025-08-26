@@ -1,0 +1,5 @@
+import { {{ENTITY_PASCAL_SINGULAR}}Form } from "@/components/{{ENTITY_KEBAB_SINGULAR}}/form/{{ENTITY_KEBAB_SINGULAR}}-form";
+
+export default function Create{{ENTITY_PASCAL_SINGULAR}}Page() {
+    return <{{ENTITY_PASCAL_SINGULAR}}Form mode="create" />;
+}

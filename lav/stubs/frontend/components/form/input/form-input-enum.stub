@@ -1,0 +1,15 @@
+<div className="space-y-1">
+  <Label htmlFor="{{FIELD}}" className="text-foreground">{{LABEL}}*</Label>
+  <Select
+    value={formData.{{FIELD}} || ""}
+    onValueChange={(val) => setFormData((prev) => ({ ...prev, "{{FIELD}}": val }))}
+    {{REQUIRED}}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="{{PLACEHOLDER}}" />
+    </SelectTrigger>
+    <SelectContent>
+      {{OPTIONS}}
+    </SelectContent>
+  </Select>
+</div>
