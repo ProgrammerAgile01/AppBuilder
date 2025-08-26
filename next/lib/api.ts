@@ -544,10 +544,12 @@ export async function fetchCrudBuilders(
 export async function generateFrontendMenu(opts?: {
   groupId?: string;
   moduleId?: string;
+  productId?: string;   // <-- TAMBAH INI
 }) {
   const url = new URL(`${API_URL}/generate-menu`);
-  if (opts?.groupId) url.searchParams.set("group_id", String(opts.groupId));
+  if (opts?.groupId)  url.searchParams.set("group_id",  String(opts.groupId));
   if (opts?.moduleId) url.searchParams.set("module_id", String(opts.moduleId));
+  if (opts?.productId) url.searchParams.set("product_id", String(opts.productId)); // <-- TAMBAH INI
 
   const res = await fetch(url.toString(), { method: "POST" });
   if (!res.ok) {
