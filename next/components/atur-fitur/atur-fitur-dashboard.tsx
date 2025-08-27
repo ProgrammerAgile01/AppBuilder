@@ -41,6 +41,12 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
 
 import {
   Settings,
@@ -222,7 +228,11 @@ export function AturFiturDashboard() {
   const [childrenLoading, setChildrenLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [showPreview, setShowPreview] = useState(false);
+
+  // Tabs (struktur | preview)
+  const [activeTab, setActiveTab] = useState<"struktur" | "preview">(
+    "struktur"
+  );
 
   // Dialog states
   const [isCreateParentOpen, setIsCreateParentOpen] = useState(false);
@@ -726,7 +736,7 @@ export function AturFiturDashboard() {
   );
 
   // ======================
-  // RENDER — UI as-is (tidak diubah)
+  // RENDER — UI as-is (dengan TAB preview terpisah)
   // ======================
 
   if (loading) {
@@ -819,15 +829,6 @@ export function AturFiturDashboard() {
                   className="w-64"
                 />
               )}
-
-              <Button
-                variant="outline"
-                onClick={() => setShowPreview(!showPreview)}
-                className="hidden lg:flex"
-              >
-                <Eye className="h-4 w-4 mr-2" />
-                {showPreview ? "Sembunyikan" : "Preview"}
-              </Button>
             </div>
           </div>
 
@@ -858,383 +859,409 @@ export function AturFiturDashboard() {
             </Card>
           </div>
         ) : (
-          <div
-            className={`grid gap-5 ${
-              showPreview
-                ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
-                : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-            }`}
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) =>
+              setActiveTab((v as "struktur" | "preview") ?? "struktur")
+            }
+            className="w-full"
           >
-            {/* Card Parent */}
-            <Card className="shadow-sm rounded-xl border-0 bg-white">
-              <CardHeader className="p-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-gray-900">
-                    <Folder className="h-5 w-5 text-blue-600" />
-                    Fitur Parent
-                  </CardTitle>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsCreateParentOpen(true)}
-                    className="rounded-lg"
-                    disabled={!selectedProduct}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                {parentsLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} className="h-16 w-full" />
-                    ))}
-                  </div>
-                ) : filteredParents.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Settings className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Belum ada fitur parent
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsCreateParentOpen(true)}
-                      disabled={!selectedProduct}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Tambah Fitur Parent
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredParents.map((parent) => (
-                      <div
-                        key={parent.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          selectedParent?.id === parent.id
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:bg-accent/50"
-                        }`}
-                        onClick={() => handleParentSelect(parent)}
+            <div className="mb-4">
+              <TabsList className="grid grid-cols-2 w-full max-w-xl">
+                <TabsTrigger value="struktur">Struktur Fitur</TabsTrigger>
+                <TabsTrigger value="preview">Preview Fitur</TabsTrigger>
+              </TabsList>
+            </div>
+
+            {/* ===== TAB STRUKTUR ===== */}
+            <TabsContent value="struktur" className="m-0">
+              <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {/* Card Parent */}
+                <Card className="shadow-sm rounded-xl border-0 bg-white">
+                  <CardHeader className="p-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-gray-900">
+                        <Folder className="h-5 w-5 text-blue-600" />
+                        Fitur Parent
+                      </CardTitle>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsCreateParentOpen(true)}
+                        className="rounded-lg"
+                        disabled={!selectedProduct}
                       >
-                        <div className="flex items-center gap-2">
-                          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium truncate">
-                              {parent.name}
-                            </h4>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {parent.code}
-                            </p>
-                            {parent.price_addon > 0 && (
-                              <p className="text-xs text-green-600">
-                                +Rp{" "}
-                                {Number(parent.price_addon).toLocaleString()}
-                                /bulan
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Badge
-                              variant={
-                                parent.status === "active"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className="cursor-pointer"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleToggleParentStatus(parent.id);
-                              }}
-                            >
-                              {parent.status}
-                            </Badge>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <MoreHorizontal className="h-3 w-3" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingParent(parent);
-                                    setParentForm({
-                                      name: parent.name,
-                                      code: parent.code,
-                                      description: parent.description || "",
-                                      price_addon: parent.price_addon || 0,
-                                      trial_available: !!parent.trial_available,
-                                      trial_days: parent.trial_days || 0,
-                                      status: parent.status,
-                                    });
-                                    setParentFormErrors({});
-                                    setIsEditParentOpen(true);
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="text-red-600"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteParentId(parent.id);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    {parentsLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2, 3].map((i) => (
+                          <Skeleton key={i} className="h-16 w-full" />
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Card Child */}
-            <Card className="shadow-sm rounded-xl border-0 bg-white">
-              <CardHeader className="p-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-gray-900">
-                    <ComponentIcon className="h-5 w-5 text-green-600" />
-                    {selectedParent
-                      ? `Child: ${selectedParent.name}`
-                      : "Fitur Child"}
-                  </CardTitle>
-                  {selectedParent && (
-                    <Button
-                      size="sm"
-                      onClick={() => setIsCreateChildOpen(true)}
-                      className="rounded-lg"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                {!selectedParent ? (
-                  <div className="text-center py-8">
-                    <ArrowLeft className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Pilih fitur parent terlebih dahulu
-                    </p>
-                  </div>
-                ) : childrenLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2].map((i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
-                    ))}
-                  </div>
-                ) : filteredChildren.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ComponentIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Belum ada fitur child
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsCreateChildOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Tambah Fitur Child
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredChildren.map((child) => {
-                      const linkedMenu = crudMenus.find(
-                        (m) => m.id === child.crud_menu_id
-                      );
-                      return (
-                        <div
-                          key={child.id}
-                          className="p-3 rounded-lg border border-gray-200 hover:bg-accent/50 transition-colors"
+                    ) : filteredParents.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Settings className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Belum ada fitur parent
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsCreateParentOpen(true)}
+                          disabled={!selectedProduct}
                         >
-                          <div className="flex items-start gap-2">
-                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab mt-1" />
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium">{child.name}</h4>
-                              <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded mt-1 inline-block">
-                                {child.feature_code}
-                              </p>
-                              {linkedMenu && (
-                                <div className="flex items-center gap-1 mt-2">
-                                  <LinkIcon className="h-3 w-3 text-green-600" />
-                                  <span className="text-xs text-green-700">
-                                    {linkedMenu.path}
-                                  </span>
-                                </div>
-                              )}
-                              {child.description && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {child.description}
+                          <Plus className="h-4 w-4 mr-1" />
+                          Tambah Fitur Parent
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredParents.map((parent) => (
+                          <div
+                            key={parent.id}
+                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                              selectedParent?.id === parent.id
+                                ? "border-blue-500 bg-blue-50"
+                                : "border-gray-200 hover:bg-accent/50"
+                            }`}
+                            onClick={() => handleParentSelect(parent)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium truncate">
+                                  {parent.name}
+                                </h4>
+                                <p className="text-xs text-muted-foreground font-mono">
+                                  {parent.code}
                                 </p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Badge
-                                variant={
-                                  child.status === "active"
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className="cursor-pointer"
-                                onClick={() =>
-                                  handleToggleChildStatus(child.id)
-                                }
-                              >
-                                {child.status}
-                              </Badge>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <MoreHorizontal className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      setEditingChild(child);
-                                      setChildForm({
-                                        feature_code: child.feature_code,
-                                        name: child.name,
-                                        crud_menu_id: child.crud_menu_id,
-                                        description: child.description || "",
-                                        status: child.status,
-                                      });
-                                      setChildFormErrors({});
-                                      setIsEditChildOpen(true);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-red-600"
-                                    onClick={() => setDeleteChildId(child.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Card Statistik */}
-            <Card className="shadow-sm rounded-xl border-0 bg-white">
-              <CardHeader className="p-4">
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-                  <BarChart3 className="h-5 w-5 text-purple-600" />
-                  Statistik
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {featureParents.length}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Parent</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">
-                      {featureChildren.length}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Child</div>
-                  </div>
-                </div>
-
-                {selectedProduct && (
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Produk Aktif</h4>
-                    <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                      <span className="text-lg">
-                        {selectedProduct.icon || "📦"}
-                      </span>
-                      <span className="font-medium">
-                        {selectedProduct.name}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Preview Tree */}
-            {showPreview && (
-              <Card className="shadow-sm rounded-xl border-0 bg-white">
-                <CardHeader className="p-4">
-                  <CardTitle className="flex items-center gap-2 text-gray-900">
-                    <Eye className="h-5 w-5 text-indigo-600" />
-                    Preview Tree
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="space-y-2">
-                    {featureParents.map((parent) => (
-                      <div key={parent.id} className="space-y-1">
-                        <div className="flex items-center gap-2 font-medium">
-                          <Folder className="h-4 w-4 text-blue-600" />
-                          {parent.name}
-                        </div>
-                        {(treeCache[parent.id] ?? [])
-                          .filter((c) => !c.deleted_at)
-                          .map((child) => {
-                            const menu = crudMenus.find(
-                              (m) => m.id === child.crud_menu_id
-                            );
-                            return (
-                              <div
-                                key={child.id}
-                                className="ml-6 flex items-center gap-2 text-sm"
-                              >
-                                <ComponentIcon className="h-3 w-3 text-green-600" />
-                                <span>{child.name}</span>
-                                <code className="text-xs bg-muted px-1 rounded">
-                                  {child.feature_code}
-                                </code>
-                                {menu && (
-                                  <span className="text-xs text-muted-foreground">
-                                    → {menu.path}
-                                  </span>
+                                {parent.price_addon > 0 && (
+                                  <p className="text-xs text-green-600">
+                                    +Rp{" "}
+                                    {Number(parent.price_addon).toLocaleString()}
+                                    /bulan
+                                  </p>
                                 )}
                               </div>
-                            );
-                          })}
+                              <div className="flex items-center gap-1">
+                                <Badge
+                                  variant={
+                                    parent.status === "active"
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                  className="cursor-pointer"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleParentStatus(parent.id);
+                                  }}
+                                >
+                                  {parent.status}
+                                </Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <MoreHorizontal className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingParent(parent);
+                                        setParentForm({
+                                          name: parent.name,
+                                          code: parent.code,
+                                          description:
+                                            parent.description || "",
+                                          price_addon:
+                                            parent.price_addon || 0,
+                                          trial_available:
+                                            !!parent.trial_available,
+                                          trial_days: parent.trial_days || 0,
+                                          status: parent.status,
+                                        });
+                                        setParentFormErrors({});
+                                        setIsEditParentOpen(true);
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-red-600"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteParentId(parent.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Card Child */}
+                <Card className="shadow-sm rounded-xl border-0 bg-white">
+                  <CardHeader className="p-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-gray-900">
+                        <ComponentIcon className="h-5 w-5 text-green-600" />
+                        {selectedParent
+                          ? `Child: ${selectedParent.name}`
+                          : "Fitur Child"}
+                      </CardTitle>
+                      {selectedParent && (
+                        <Button
+                          size="sm"
+                          onClick={() => setIsCreateChildOpen(true)}
+                          className="rounded-lg"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    {!selectedParent ? (
+                      <div className="text-center py-8">
+                        <ArrowLeft className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Pilih fitur parent terlebih dahulu
+                        </p>
+                      </div>
+                    ) : childrenLoading ? (
+                      <div className="space-y-2">
+                        {[1, 2].map((i) => (
+                          <Skeleton key={i} className="h-20 w-full" />
+                        ))}
+                      </div>
+                    ) : filteredChildren.length === 0 ? (
+                      <div className="text-center py-8">
+                        <ComponentIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Belum ada fitur child
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsCreateChildOpen(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Tambah Fitur Child
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredChildren.map((child) => {
+                          const linkedMenu = crudMenus.find(
+                            (m) => m.id === child.crud_menu_id
+                          );
+                          return (
+                            <div
+                              key={child.id}
+                              className="p-3 rounded-lg border border-gray-200 hover:bg-accent/50 transition-colors"
+                            >
+                              <div className="flex items-start gap-2">
+                                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab mt-1" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium">
+                                    {child.name}
+                                  </h4>
+                                  <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded mt-1 inline-block">
+                                    {child.feature_code}
+                                  </p>
+                                  {linkedMenu && (
+                                    <div className="flex items-center gap-1 mt-2">
+                                      <LinkIcon className="h-3 w-3 text-green-600" />
+                                      <span className="text-xs text-green-700">
+                                        {linkedMenu.path}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {child.description && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {child.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Badge
+                                    variant={
+                                      child.status === "active"
+                                        ? "default"
+                                        : "secondary"
+                                    }
+                                    className="cursor-pointer"
+                                    onClick={() =>
+                                      handleToggleChildStatus(child.id)
+                                    }
+                                  >
+                                    {child.status}
+                                  </Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <MoreHorizontal className="h-3 w-3" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setEditingChild(child);
+                                          setChildForm({
+                                            feature_code: child.feature_code,
+                                            name: child.name,
+                                            crud_menu_id: child.crud_menu_id,
+                                            description:
+                                              child.description || "",
+                                            status: child.status,
+                                          });
+                                          setChildFormErrors({});
+                                          setIsEditChildOpen(true);
+                                        }}
+                                      >
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-red-600"
+                                        onClick={() =>
+                                          setDeleteChildId(child.id)
+                                        }
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Card Statistik */}
+                <Card className="shadow-sm rounded-xl border-0 bg-white">
+                  <CardHeader className="p-4">
+                    <CardTitle className="flex items-center gap-2 text-gray-900">
+                      <BarChart3 className="h-5 w-5 text-purple-600" />
+                      Statistik
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {featureParents.length}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Parent
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {featureChildren.length}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Child
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedProduct && (
+                      <div className="space-y-2">
+                        <h4 className="font-medium">Produk Aktif</h4>
+                        <div className="flex items-center gap-2 p-2 bg-muted rounded">
+                          <span className="text-lg">
+                            {selectedProduct.icon || "📦"}
+                          </span>
+                          <span className="font-medium">
+                            {selectedProduct.name}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* ===== TAB PREVIEW ===== */}
+            <TabsContent value="preview" className="m-0">
+              <div className="grid gap-5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <Card className="shadow-sm rounded-xl border-0 bg-white md:col-span-2 lg:col-span-3">
+                  <CardHeader className="p-4">
+                    <CardTitle className="flex items-center gap-2 text-gray-900">
+                      <Eye className="h-5 w-5 text-indigo-600" />
+                      Preview Tree
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="space-y-2">
+                      {featureParents.map((parent) => (
+                        <div key={parent.id} className="space-y-1">
+                          <div className="flex items-center gap-2 font-medium">
+                            <Folder className="h-4 w-4 text-blue-600" />
+                            {parent.name}
+                          </div>
+                          {(treeCache[parent.id] ?? [])
+                            .filter((c) => !c.deleted_at)
+                            .map((child) => {
+                              const menu = crudMenus.find(
+                                (m) => m.id === child.crud_menu_id
+                              );
+                              return (
+                                <div
+                                  key={child.id}
+                                  className="ml-6 flex items-center gap-2 text-sm"
+                                >
+                                  <ComponentIcon className="h-3 w-3 text-green-600" />
+                                  <span>{child.name}</span>
+                                  <code className="text-xs bg-muted px-1 rounded">
+                                    {child.feature_code}
+                                  </code>
+                                  {menu && (
+                                    <span className="text-xs text-muted-foreground">
+                                      → {menu.path}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
         )}
       </div>
 
@@ -1572,153 +1599,140 @@ export function AturFiturDashboard() {
           <DialogHeader>
             <DialogTitle>Tambah Fitur Child</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Product</Label>
-              <Input
-                value={selectedProduct?.name || ""}
-                disabled
-                className="bg-muted"
-              />
-            </div>
-
-            <div>
-              <Label>Fitur Parent</Label>
-              <Input
-                value={
-                  selectedParent
-                    ? `${selectedParent.name} (${selectedParent.code})`
-                    : ""
-                }
-                disabled
-                className="bg-muted"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="feature_code">Kode Fitur *</Label>
-              <Input
-                id="feature_code"
-                value={childForm.feature_code}
-                onChange={(e) => {
-                  setChildForm((prev) => ({
-                    ...prev,
-                    feature_code: e.target.value,
-                  }));
-                  if (childFormErrors.feature_code)
-                    setChildFormErrors((prev) => ({
-                      ...prev,
-                      feature_code: "",
-                    }));
-                }}
-                className={`font-mono ${
-                  childFormErrors.feature_code ? "border-red-500" : ""
-                }`}
-                placeholder="wa.send_booking"
-              />
-              {childFormErrors.feature_code && (
-                <p className="text-sm text-red-500 mt-1">
-                  {childFormErrors.feature_code}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="child-name">Nama Child *</Label>
-              <Input
-                id="child-name"
-                value={childForm.name}
-                onChange={(e) => {
-                  setChildForm((prev) => ({ ...prev, name: e.target.value }));
-                  if (childFormErrors.name)
-                    setChildFormErrors((prev) => ({ ...prev, name: "" }));
-                }}
-                className={childFormErrors.name ? "border-red-500" : ""}
-              />
-              {childFormErrors.name && (
-                <p className="text-sm text-red-500 mt-1">
-                  {childFormErrors.name}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label>Pilih Menu *</Label>
-              <Select
-                value={childForm.crud_menu_id}
-                onValueChange={(value) => {
-                  setChildForm((prev) => ({ ...prev, crud_menu_id: value }));
-                  if (childFormErrors.crud_menu_id)
-                    setChildFormErrors((prev) => ({
-                      ...prev,
-                      crud_menu_id: "",
-                    }));
-                }}
-              >
-                <SelectTrigger
-                  className={
-                    childFormErrors.crud_menu_id ? "border-red-500" : ""
-                  }
-                >
-                  <SelectValue placeholder="Pilih menu dari CRUD Builder" />
-                </SelectTrigger>
-                <SelectContent>
-                  {crudMenus.map((menu) => (
-                    <SelectItem key={menu.id} value={menu.id}>
-                      {menu.path}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {childFormErrors.crud_menu_id && (
-                <p className="text-sm text-red-500 mt-1">
-                  {childFormErrors.crud_menu_id}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="child-description">Deskripsi</Label>
-              <Textarea
-                id="child-description"
-                value={childForm.description}
-                onChange={(e) =>
-                  setChildForm((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label>Status</Label>
-              <Select
-                value={childForm.status}
-                onValueChange={(value: "active" | "hidden") =>
-                  setChildForm((prev) => ({ ...prev, status: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="hidden">Hidden</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="space-y-4">
+          <div>
+            <Label>Product</Label>
+            <Input value={selectedProduct?.name || ""} disabled className="bg-muted" />
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsCreateChildOpen(false)}
+
+          <div>
+            <Label>Fitur Parent</Label>
+            <Input
+              value={
+                selectedParent ? `${selectedParent.name} (${selectedParent.code})` : ""
+              }
+              disabled
+              className="bg-muted"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="feature_code">Kode Fitur *</Label>
+            <Input
+              id="feature_code"
+              value={childForm.feature_code}
+              onChange={(e) => {
+                setChildForm((prev) => ({
+                  ...prev,
+                  feature_code: e.target.value,
+                }));
+                if (childFormErrors.feature_code)
+                  setChildFormErrors((prev) => ({
+                    ...prev,
+                    feature_code: "",
+                  }));
+              }}
+              className={`font-mono ${childFormErrors.feature_code ? "border-red-500" : ""}`}
+              placeholder="wa.send_booking"
+            />
+            {childFormErrors.feature_code && (
+              <p className="text-sm text-red-500 mt-1">
+                {childFormErrors.feature_code}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="child-name">Nama Child *</Label>
+            <Input
+              id="child-name"
+              value={childForm.name}
+              onChange={(e) => {
+                setChildForm((prev) => ({ ...prev, name: e.target.value }));
+                if (childFormErrors.name)
+                  setChildFormErrors((prev) => ({ ...prev, name: "" }));
+              }}
+              className={childFormErrors.name ? "border-red-500" : ""}
+            />
+            {childFormErrors.name && (
+              <p className="text-sm text-red-500 mt-1">
+                {childFormErrors.name}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label>Pilih Menu *</Label>
+            <Select
+              value={childForm.crud_menu_id}
+              onValueChange={(value) => {
+                setChildForm((prev) => ({ ...prev, crud_menu_id: value }));
+                if (childFormErrors.crud_menu_id)
+                  setChildFormErrors((prev) => ({
+                    ...prev,
+                    crud_menu_id: "",
+                  }));
+              }}
             >
-              Cancel
-            </Button>
-            <Button onClick={handleCreateChild}>Simpan</Button>
-          </DialogFooter>
+              <SelectTrigger
+                className={childFormErrors.crud_menu_id ? "border-red-500" : ""}
+              >
+                <SelectValue placeholder="Pilih menu dari CRUD Builder" />
+              </SelectTrigger>
+              <SelectContent>
+                {crudMenus.map((menu) => (
+                  <SelectItem key={menu.id} value={menu.id}>
+                    {menu.path}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {childFormErrors.crud_menu_id && (
+              <p className="text-sm text-red-500 mt-1">
+                {childFormErrors.crud_menu_id}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label htmlFor="child-description">Deskripsi</Label>
+            <Textarea
+              id="child-description"
+              value={childForm.description}
+              onChange={(e) =>
+                setChildForm((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              rows={3}
+            />
+          </div>
+
+          <div>
+            <Label>Status</Label>
+            <Select
+              value={childForm.status}
+              onValueChange={(value: "active" | "hidden") =>
+                setChildForm((prev) => ({ ...prev, status: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="hidden">Hidden</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setIsCreateChildOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreateChild}>Simpan</Button>
+        </DialogFooter>
         </DialogContent>
       </Dialog>
 

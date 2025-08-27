@@ -75,41 +75,13 @@ const navigation = [
     badge: "New",
   },
   {
-    name: "Feature Builder",
+    name: "Atur Fitur",
     href: "/admin/atur-fitur",
     icon: Navigation,
     description: "Atur Fitur System",
     badge: "New",
   },
-  {
-    name: "Atur Feature ",
-    href: "/admin/feature-builder",
-    icon: Palette,
-    description: "Feature Bulder System",
-    badge: "New",
-  },
-
-  {
-    name: "Modules",
-    href: "/admin/modules",
-    icon: Layers,
-    description: "Kelola modul CRUD",
-    current: false,
-  },
-  {
-    name: "Modules Table",
-    href: "/admin/modules-table",
-    icon: Table,
-    description: "Tampilan tabel modul",
-    current: false,
-  },
-  {
-    name: "Database",
-    href: "/admin/database",
-    icon: Database,
-    description: "Manajemen database",
-    current: false,
-  },
+ 
   {
     name: "Users",
     href: "/admin/users",

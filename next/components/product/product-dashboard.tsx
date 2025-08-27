@@ -57,6 +57,7 @@ interface Product {
   status: "Active" | "Inactive" | "Archived";
   createdAt: string;
   updatedAt: string;
+  dbName?: string; // ← tambahkan properti opsional (tidak mengubah UI lain)
 }
 
 // Helper status mapping
@@ -70,6 +71,21 @@ const toTitle = (s: string) =>
     : s ?? "Active";
 const toLower = (s: Product["status"]) => s.toLowerCase();
 
+// helper db_name dari product code → snake_case (maks 60 char)
+function toDbNameSuggestion(src: string) {
+  const s = (src || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+  return s.slice(0, 60) || "";
+}
+
+// validasi ringan db_name (biar tidak mengubah UI lain, hanya toast)
+function isValidDbName(s: string) {
+  return /^[A-Za-z0-9_]{1,60}$/.test(s);
+}
+
 export function ProductDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -81,6 +97,7 @@ export function ProductDashboard() {
     productCode: "",
     productName: "",
     status: "Active" as Product["status"],
+    dbName: "", // ← field baru di form
   });
 
   // ====== Trash modal & badge state ======
@@ -116,6 +133,7 @@ export function ProductDashboard() {
         status: toTitle(it.status) as Product["status"],
         createdAt: (it.created_at ?? "").slice(0, 10),
         updatedAt: (it.updated_at ?? "").slice(0, 10),
+        dbName: it.db_name ?? undefined, // ← map bila tersedia
       }));
       setProducts(mapped);
 
@@ -139,9 +157,10 @@ export function ProductDashboard() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      const q = searchTerm.toLowerCase();
       const matchesSearch =
-        product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.productCode.toLowerCase().includes(searchTerm.toLowerCase());
+        product.productName.toLowerCase().includes(q) ||
+        product.productCode.toLowerCase().includes(q);
       const matchesStatus =
         statusFilter === "all" ||
         product.status === (statusFilter as Product["status"]);
@@ -156,6 +175,12 @@ export function ProductDashboard() {
         return;
       }
 
+      // validasi opsional db_name jika diisi
+      if (formData.dbName && !isValidDbName(formData.dbName)) {
+        toast.error("DB Name hanya boleh huruf/angka/underscore (maks 60)");
+        return;
+      }
+
       const exists = products.find(
         (p) =>
           p.productCode.toUpperCase() === formData.productCode.toUpperCase()
@@ -165,16 +190,24 @@ export function ProductDashboard() {
         return;
       }
 
-      const payload = {
+      const payload: any = {
         product_code: formData.productCode.toUpperCase(),
         product_name: formData.productName,
         status: toLower(formData.status),
       };
 
+      // kirim db_name bila ada (server juga bisa auto-generate jika kosong)
+      if (formData.dbName) payload.db_name = formData.dbName;
+
       await createData("products", payload);
       toast.success("Product berhasil ditambahkan");
       setIsCreateDialogOpen(false);
-      setFormData({ productCode: "", productName: "", status: "Active" });
+      setFormData({
+        productCode: "",
+        productName: "",
+        status: "Active",
+        dbName: "",
+      });
       await reload();
     } catch (e: any) {
       toast.error(e?.message || "Gagal menambah product");
@@ -188,6 +221,12 @@ export function ProductDashboard() {
         return;
       }
 
+      // validasi opsional db_name bila diisi
+      if (formData.dbName && !isValidDbName(formData.dbName)) {
+        toast.error("DB Name hanya boleh huruf/angka/underscore (maks 60)");
+        return;
+      }
+
       const exists = products.find(
         (p) =>
           p.productCode.toUpperCase() === formData.productCode.toUpperCase() &&
@@ -198,17 +237,25 @@ export function ProductDashboard() {
         return;
       }
 
-      const payload = {
+      const payload: any = {
         product_code: formData.productCode.toUpperCase(),
         product_name: formData.productName,
         status: toLower(formData.status),
       };
 
+      // kirim db_name bila ada; kalau kosong tidak dikirim agar backend tetap mempertahankan nilai lama
+      if (formData.dbName) payload.db_name = formData.dbName;
+
       await updateData("products", editingProduct.id, payload);
       toast.success("Product berhasil diperbarui");
       setIsEditDialogOpen(false);
       setEditingProduct(null);
-      setFormData({ productCode: "", productName: "", status: "Active" });
+      setFormData({
+        productCode: "",
+        productName: "",
+        status: "Active",
+        dbName: "",
+      });
       await reload();
     } catch (e: any) {
       toast.error(e?.message || "Gagal memperbarui product");
@@ -241,6 +288,7 @@ export function ProductDashboard() {
       productCode: product.productCode,
       productName: product.productName,
       status: product.status,
+      dbName: product.dbName || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -318,14 +366,15 @@ export function ProductDashboard() {
         : Array.isArray(json)
         ? json
         : [];
-      const mapped: Product[] = arr.map((it) => ({
+      const mapped: Product[] = arr.map((it) => (({
         id: String(it.id),
         productCode: it.product_code,
         productName: it.product_name,
         status: toTitle(it.status) as Product["status"],
         createdAt: (it.created_at ?? "").slice(0, 10),
         updatedAt: (it.updated_at ?? "").slice(0, 10),
-      }));
+        dbName: it.db_name ?? undefined,
+      })));
       setTrashed(mapped);
       setTrashCount(mapped.length);
     } catch (e: any) {
@@ -510,12 +559,21 @@ export function ProductDashboard() {
                     id="productCode"
                     placeholder="RENTVIX"
                     value={formData.productCode}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        productCode: e.target.value.toUpperCase(),
-                      })
-                    }
+                    onChange={(e) => {
+                      const code = e.target.value.toUpperCase();
+                      setFormData((prev) => {
+                        // jika dbName masih kosong atau masih auto-suggest, ikutkan saran baru
+                        const suggested = toDbNameSuggestion(code);
+                        const keepCurrent =
+                          prev.dbName &&
+                          prev.dbName !== toDbNameSuggestion(prev.productCode);
+                        return {
+                          ...prev,
+                          productCode: code,
+                          dbName: keepCurrent ? prev.dbName : suggested,
+                        };
+                      });
+                    }}
                   />
                 </div>
                 <div>
@@ -529,6 +587,24 @@ export function ProductDashboard() {
                     }
                   />
                 </div>
+
+                {/* ===== DB NAME (tambahan) ===== */}
+                <div>
+                  <Label htmlFor="dbName">DB Name</Label>
+                  <Input
+                    id="dbName"
+                    placeholder="rentvix_pro"
+                    value={formData.dbName}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        dbName: e.target.value.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 60),
+                      })
+                    }
+                  />
+                  {/* tidak menambah elemen UI lain; validasi via toast saat submit */}
+                </div>
+
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select
@@ -745,9 +821,18 @@ export function ProductDashboard() {
                 id="editProductCode"
                 value={formData.productCode}
                 onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    productCode: e.target.value.toUpperCase(),
+                  setFormData((prev) => {
+                    const code = e.target.value.toUpperCase();
+                    // hanya update saran bila dbName tampak auto sebelumnya
+                    const suggestedBefore = toDbNameSuggestion(prev.productCode);
+                    const userChanged =
+                      prev.dbName && prev.dbName !== suggestedBefore;
+                    const suggestedNow = toDbNameSuggestion(code);
+                    return {
+                      ...prev,
+                      productCode: code,
+                      dbName: userChanged ? prev.dbName : suggestedNow,
+                    };
                   })
                 }
               />
@@ -762,6 +847,22 @@ export function ProductDashboard() {
                 }
               />
             </div>
+
+            {/* ===== DB NAME (tambahan) ===== */}
+            <div>
+              <Label htmlFor="editDbName">DB Name</Label>
+              <Input
+                id="editDbName"
+                value={formData.dbName}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dbName: e.target.value.replace(/[^A-Za-z0-9_]/g, "_").slice(0, 60),
+                  })
+                }
+              />
+            </div>
+
             <div>
               <Label htmlFor="editStatus">Status</Label>
               <Select

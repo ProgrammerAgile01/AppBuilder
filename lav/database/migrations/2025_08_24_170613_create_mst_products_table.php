@@ -12,6 +12,7 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->string('product_code', 64)->unique();
             $table->string('product_name', 160);
+            $table->string('db_name',60);
             $table->enum('status', ['active','inactive','archived'])->default('active');
             $table->timestamps();
             $table->softDeletes(); // <— penting: deleted_at

@@ -15,7 +15,8 @@ class Product extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['product_code', 'product_name', 'status'];
+    // ⬇️ tambahkan db_name ke fillable
+    protected $fillable = ['product_code', 'product_name', 'status', 'db_name'];
 
     protected static function booted()
     {
