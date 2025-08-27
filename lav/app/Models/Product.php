@@ -31,4 +31,10 @@ class Product extends Model
     {
         return $this->hasMany(CrudBuilder::class);
     }
+
+    // relasi template frontend
+    public function templateFrontend()
+    {
+        return $this->belongsTo(TemplateFrontend::class);
+    }
 }

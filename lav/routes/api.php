@@ -5,6 +5,7 @@ use App\Http\Controllers\FeatureBuilderController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\ModulesController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\TemplateFrontendController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -47,6 +48,11 @@ Route::apiResource('products', ProductController::class);
 // Tambahan untuk trash
 Route::post('products/{id}/restore', [ProductController::class, 'restore']);
 Route::delete('products/{id}/force', [ProductController::class, 'forceDelete']);
+
+// template frontend
+Route::apiResource('template-frontend', TemplateFrontendController::class);
+Route::post('template-frontend/{id}/restore', [TemplateFrontendController::class, 'restore']);
+Route::delete('template-frontend/{id}/force', [TemplateFrontendController::class, 'forceDelete']);
 
 // Atur Fitur
 Route::get('fitur/tree', [FeatureBuilderController::class, 'tree']);

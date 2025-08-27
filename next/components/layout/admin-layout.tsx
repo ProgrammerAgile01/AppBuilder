@@ -57,6 +57,12 @@ const navigation = [
     badge: null,
   },
   {
+    title: "Template Frontend",
+    href: "/admin/template-frontend",
+    icon: Layers,
+    badge: null,
+  },
+  {
     title: "Product",
     href: "/admin/product",
     icon: Package,

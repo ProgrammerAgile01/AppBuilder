@@ -1,4 +1,5 @@
-Route::get('{{ROUTE_PATH}}/actions', [{{CONTROLLER_NAME}}::class, 'listActions']);
-Route::match(['GET','POST'], '{{ROUTE_PATH}}/actions/{actionKey}', [{{CONTROLLER_NAME}}::class, 'runAction']);
+// Route for {{ROUTE_PATH}}
+Route::get('{{ROUTE_PATH}}/actions', [\App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class, 'listActions']);
+Route::match(['GET','POST'], '{{ROUTE_PATH}}/actions/{actionKey}', [\App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class, 'runAction']);
 Route::get('{{ROUTE_PATH}}/export-excel', [\App\Http\Controllers\Generate\{{CONTROLLER_NAME}}::class, 'exportExcel']);
-Route::apiResource('{{ROUTE_PATH}}', {{CONTROLLER_NAME}}::class);
+Route::apiResource('{{ROUTE_PATH}}', \App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class);

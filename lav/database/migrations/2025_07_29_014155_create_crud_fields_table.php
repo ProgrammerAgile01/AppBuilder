@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('crud_fields', function (Blueprint $table) {
             $table->id();
             $table->foreignId('crud_builder_id')->constrained()->onDelete('cascade');
-            $table->foreignId('field_category_id')->nullable()->constrained('field_categories')->onDelete('set null');
 
             // Info kolom
             $table->string('nama_kolom');
