@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CrudBuilderController;
+use App\Http\Controllers\FeatureBuilderController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\ModulesController;
 use App\Http\Controllers\ProductController;
@@ -46,3 +47,10 @@ Route::apiResource('products', ProductController::class);
 // Tambahan untuk trash
 Route::post('products/{id}/restore', [ProductController::class, 'restore']);
 Route::delete('products/{id}/force', [ProductController::class, 'forceDelete']);
+
+// Atur Fitur
+Route::get('fitur/tree', [FeatureBuilderController::class, 'tree']);
+Route::apiResource('fitur', FeatureBuilderController::class);
+Route::post('fitur/{id}/toggle', [FeatureBuilderController::class, 'toggle']);
+Route::post('fitur/{id}/restore', [FeatureBuilderController::class, 'restore']);
+Route::delete('fitur/{id}/force', [FeatureBuilderController::class, 'force']);

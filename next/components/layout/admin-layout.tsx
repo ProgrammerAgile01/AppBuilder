@@ -80,48 +80,48 @@ const navigation = [
     icon: Navigation,
     badge: null,
   },
+  // {
+  //   title: "Atur Fitur",
+  //   href: "/admin/atur-fitur",
+  //   icon: Sparkles,
+  //   badge: null,
+  // },
+  // {
+  //   title: "Package Builder",
+  //   href: "/admin/package-builder",
+  //   icon: Zap,
+  //   badge: "New",
+  // },
   {
     title: "Atur Fitur",
-    href: "/admin/atur-fitur",
-    icon: Sparkles,
-    badge: null,
-  },
-  {
-    title: "Package Builder",
-    href: "/admin/package-builder",
-    icon: Zap,
-    badge: "New",
-  },
-  {
-    title: "Feature Builder",
     href: "/admin/feature-builder",
     icon: Settings,
     badge: "New",
   },
-  {
-    title: "Database",
-    href: "/admin/database",
-    icon: Database,
-    badge: null,
-  },
-  {
-    title: "Modules",
-    href: "/admin/modules",
-    icon: Package,
-    badge: null,
-  },
-  {
-    title: "Modules Table",
-    href: "/admin/modules-table",
-    icon: Table,
-    badge: null,
-  },
-  {
-    title: "Font Test",
-    href: "/admin/font-test",
-    icon: FileText,
-    badge: null,
-  },
+  // {
+  //   title: "Database",
+  //   href: "/admin/database",
+  //   icon: Database,
+  //   badge: null,
+  // },
+  // {
+  //   title: "Modules",
+  //   href: "/admin/modules",
+  //   icon: Package,
+  //   badge: null,
+  // },
+  // {
+  //   title: "Modules Table",
+  //   href: "/admin/modules-table",
+  //   icon: Table,
+  //   badge: null,
+  // },
+  // {
+  //   title: "Font Test",
+  //   href: "/admin/font-test",
+  //   icon: FileText,
+  //   badge: null,
+  // },
 ];
 
 const recentModules = [

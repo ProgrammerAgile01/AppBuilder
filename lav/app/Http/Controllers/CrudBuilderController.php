@@ -14,6 +14,7 @@ use Str;
 
 class CrudBuilderController extends Controller
 {
+    // =========== REST METHOD ===========
     /**
      * Display a listing of the resource.
      */
@@ -644,7 +645,116 @@ class CrudBuilderController extends Controller
     }
 
     /**
-     * Helper publish stub.
+     * CONFIG & PATH HELPERS — PER PRODUK.
+     */
+    private string $productSlug = '';
+    private string $productRoot = ''; // appgenerate/{PRODUCT}
+    private string $backRoot    = ''; // appgenerate/{PRODUCT}/lav-gen
+    private string $frontRoot   = ''; // appgenerate/{PRODUCT}/next-gen
+
+    // product slug (nama product / kode)
+    private function resolveProductSlug($builder): string
+    {
+        $p = $builder->product ?? null;
+
+        $raw = $p->product_code ?? 'DEFAULT';
+
+        return strtoupper(Str::slug($raw, '_'));
+    }
+    
+    // project root (tata letak folder project)
+    private function setProjectRoots($builder): void
+    {
+        $this->productSlug = $this->resolveProductSlug($builder);
+        $this->productRoot = base_path('../appgenerate/' . $this->productSlug);
+        $this->backRoot    = $this->productRoot . '/lav-gen';
+        $this->frontRoot   = $this->productRoot . '/next-gen';
+
+        // Pastikan folder induk ada
+        File::ensureDirectoryExists($this->productRoot);
+        File::ensureDirectoryExists($this->backRoot);
+        File::ensureDirectoryExists($this->frontRoot);
+
+        // Bootstrap(create) proyek jika belum ada
+        $this->bootstrapProductProjects();
+
+        // readme instalasi
+        $this->writeProductReadme($builder);
+    }
+
+    // Product path
+    private function productPath(string $rel = ''): string
+    {
+        return rtrim($this->productRoot . '/' . ltrim($rel, '/'), '/');
+    }
+    private function backPath(string $rel = ''): string
+    {
+        return rtrim($this->backRoot . '/' . ltrim($rel, '/'), '/');
+    }
+    private function frontPath(string $rel = ''): string
+    {
+        return rtrim($this->frontRoot . '/' . ltrim($rel, '/'), '/');
+    }
+
+    /**
+     * BOOTSTRAP: COPY SKELETON → {PRODUCT}/lav-gen & next-gen.
+     */
+    private function copyDirectory(string $from, string $to): void
+    {
+        File::ensureDirectoryExists($to);
+        File::copyDirectory($from, $to);
+    }
+
+    private function bootstrapProductProjects(): void
+    {
+        // Laravel skeleton
+        if (!File::exists($this->backPath('composer.json'))) {
+            $src = base_path('stubs/skeletons/laravel-12');
+            if (!File::exists($src)) {
+                throw new \RuntimeException("Skeleton Laravel tidak ditemukan: $src");
+            }
+            $this->copyDirectory($src, $this->backRoot);
+
+            // siapkan .env dari .env.example jika ada
+            if (!File::exists($this->backPath('.env')) && File::exists($this->backPath('.env.example'))) {
+                File::copy($this->backPath('.env.example'), $this->backPath('.env'));
+            }
+            // optional: tak perlu key:generate / storage:link di sini (bisa manual)
+        }
+
+        // Next skeleton
+        if (!File::exists($this->frontPath('package.json'))) {
+            $src = base_path('stubs/skeletons/next-14');
+            if (File::exists($src)) {
+                $this->copyDirectory($src, $this->frontRoot);
+            } else {
+                // kalau belum punya skeleton Next, buat folder minimal
+                File::ensureDirectoryExists($this->frontPath('app'));
+                File::ensureDirectoryExists($this->frontPath('components'));
+                File::ensureDirectoryExists($this->frontPath('lib'));
+                if (!File::exists($this->frontPath('package.json'))) {
+                    File::put($this->frontPath('package.json'), json_encode([
+                        "name" => "next-gen",
+                        "private" => true,
+                        "version" => "0.0.0"
+                    ], JSON_PRETTY_PRINT));
+                }
+            }
+
+            if (!File::exists($this->frontPath('.env.local'))) {
+                File::put($this->frontPath('.env.local'), "NEXT_PUBLIC_API_URL=http://localhost:8000/api\n");
+            }
+
+            // pastikan routes/api.php ada di backend
+            if (!File::exists($this->backPath('routes/api.php'))) {
+                File::ensureDirectoryExists($this->backPath('routes'));
+                File::put($this->backPath('routes/api.php'), "<?php\nuse Illuminate\\Support\\Facades\\Route;\n");
+            }
+        }
+    }
+
+    /**
+     * UTIL STUB PUBLISHER.
      */
     private function writeOnce(string $dest, string $content): void
     {
@@ -669,38 +779,106 @@ class CrudBuilderController extends Controller
     }
 
     /**
-     * Publish runtime (backend + frontend) sekali tiap run.
+     * Publish runtime (backend + frontend) path dinamis.
      */
-
-    private function scaffoldActionRuntime(): void
+    private function scaffoldActionRuntime(string $back, string $front): void
     {
-        // BACKEND (Laravel hasil generate)
-        $back = base_path('../appgenerate/lav-gen');
-
-        $this->publishStub(base_path('stubs/runtime/ActionContract.stub'),         "$back/app/Builder/Contracts/ActionContract.php");
-        $this->publishStub(base_path('stubs/runtime/ActionRegistry.stub'),         "$back/app/Builder/ActionRegistry.php");
-        $this->publishStub(base_path('stubs/runtime/config.builder_actions.stub'), "$back/config/builder_actions.php");
-        $this->publishStub(base_path('stubs/export/pdf/ExportPdfController.stub'), "$back/app/Http/Controllers/Export/ExportPdfController.php", [], overwrite: true);
-        $this->publishStub(base_path('stubs/export/pdf/pdf_generic.stub'),         "$back/resources/views/pdf/generic.blade.php");
+        // Backend runtime
+        $this->publishStub(base_path('stubs/runtime/ActionContract.stub'),         $back . "/app/Builder/Contracts/ActionContract.php");
+        $this->publishStub(base_path('stubs/runtime/ActionRegistry.stub'),         $back . "/app/Builder/ActionRegistry.php");
+        $this->publishStub(base_path('stubs/runtime/config.builder_actions.stub'), $back . "/config/builder_actions.php");
+        $this->publishStub(base_path('stubs/export/pdf/ExportPdfController.stub'), $back . "/app/Http/Controllers/Export/ExportPdfController.php", [], overwrite: true);
+        $this->publishStub(base_path('stubs/export/pdf/pdf_generic.stub'),         $back . "/resources/views/pdf/generic.blade.php");
 
         foreach (['UploadMasterCsv','ExportCsv','RecalculateStats'] as $a) {
-            $this->publishStub(base_path("stubs/runtime/actions/{$a}.stub"),       "$back/app/Builder/Actions/{$a}.php");
+            $this->publishStub(base_path("stubs/runtime/actions/{$a}.stub"),       $back . "/app/Builder/Actions/{$a}.php");
         }
 
-        // FRONTEND (Next.js hasil generate)
-        $front = base_path('../appgenerate/next-gen');
+        // Frontend runtime
+        $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),   $front . "/lib/actions.ts");
+        $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),     $front . "/components/actions/ActionBar.tsx");
+    }
 
-        $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),   "$front/lib/actions.ts");
-        $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),     "$front/components/actions/ActionBar.tsx");
+    /**
+     * Readme instalasi product (laravel dan nextjs).
+     */
+    private function writeProductReadme($builder, bool $overwrite = false): void
+    {
+        $product = $this->productSlug;
+        $dest = $this->productPath('README.md');
+
+        if (!$overwrite && File::exists($dest)) {
+            return; // jangan timpa kalau sudah ada
+        }
+
+        $md = <<<MD
+# {$product} — Hasil Generate
+
+Folder ini berisi dua proyek:
+- **./lav-gen** — Laravel 12 (API)
+- **./next-gen** — Next.js 14 (Frontend)
+
+> Catatan: README ini dibuat otomatis oleh generator. Jika ingin menimpa konten ini di masa depan, panggil method dengan \$overwrite=true atau edit manual file ini.
+
+---
+
+## Prasyarat
+- **PHP ≥ 8.2** (+ ekstensi umum: OpenSSL, PDO, Mbstring, Tokenizer, XML, Ctype, JSON, BCMath, Fileinfo)
+- **Composer**
+- **Node.js ≥ 18.17** + npm (atau yarn/pnpm)
+- **Database** (MySQL/PostgreSQL/SQLite) untuk Laravel
+- Git (opsional)
+
+---
+
+## 1. Setup Backend (Laravel 12)
+**Windows (PowerShell/CMD):**
+```ps1
+cd lav-gen
+composer install
+cp .env.example .env
+# edit .env: DB_*, APP_URL=http://localhost:8000
+php artisan key:generate
+php artisan storage:link
+php artisan route:install (opsional)
+php artisan migrate
+php artisan serve
+
+---
+
+## 2. Setup Frontend (Next 14)
+**Windows (PowerShell/CMD):**
+```ps1
+cd next-gen
+npm install / pnpm install / yarn
+# buat file .env.local yang berisi
+NEXT_PUBLIC_API_URL=http://localhost:8000/api (sesuaikan api backend)
+npm run dev
+MD;
+        File::put($dest, $md);
+    }
+
+    /**
+     * GENERATE — pakai skeleton.
+     */
+    private function scaffoldActionRuntimeOnce(): void
+    {
+        $this->scaffoldActionRuntime($this->backRoot, $this->frontRoot);
     }
 
     public function generate($id)
     {
         try {
-            // publish runtime sekali
-            $this->scaffoldActionRuntime();
+            // load builder dengan relasi
+            $builder = CrudBuilder::with(['product', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
-            $builder = CrudBuilder::with(['fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            // Set root per product & bootstrap skeleton proyek jika belum ada
+            $this->setProjectRoots($builder);
+
+            // Publish runtime (contracts, action bar, dll)
+            $this->scaffoldActionRuntimeOnce();
+
+            // Data dasar
             $table = $builder->nama_tabel; // kendaraans
             $entity = ucfirst(Str::studly($table)); // Kendaraan
             $fields = collect($builder->fields)->map(callback: fn($f) => (object) $f);
@@ -735,22 +913,26 @@ class CrudBuilderController extends Controller
             // generate menu frontend
             // $this->updateFrontendMenu($table, $builder->modules->menu_title ?? 'Modul');
 
+            // Update status setelah generate menjadi published
             if ($id) {
                 CrudBuilder::where('id', $id)->update(['status' => 'published']);
             }
 
             return response()->json([
                 'success' => true,
-                'message' => "Berhasil generate CRUD untuk $entity"
+                'message' => "Berhasil generate CRUD untuk $entity di product {$this->productSlug}"
             ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => "Gagal generate CRUD untuk " . $entity . " " . $e->getMessage(),
+                'message' => "Gagal generate CRUD" . $e->getMessage(),
             ], 500);
         }
     }
 
+    /**
+     * BACKEND CODEGEN (migrasi, model, controller, route, export).
+     */
     private function generateMigration($table, $fields)
     {
         try {
@@ -790,7 +972,7 @@ class CrudBuilderController extends Controller
                 $template
             );
 
-            $filename = base_path('../appgenerate/lav-gen/database/migrations/' . now()->format('Y_m_d_His') . "_create_{$table}_table.php");
+            $filename = $this->backPath('database/migrations/' . now()->format('Y_m_d_His') . "_create_{$table}_table.php");
             File::put($filename, $content);
         } catch (\Exception $e) {
             throw new \Exception("Gagal generate migration " . $e->getMessage());
@@ -898,7 +1080,7 @@ class CrudBuilderController extends Controller
                 $template
             );
 
-            File::put(base_path("../appgenerate/lav-gen/app/Models/{$entity}.php"), $content);
+            File::put($this->backPath("app/Models/{$entity}.php"), $content);
         } catch (\Exception $e) {
             throw new \Exception("Gagal generate model " . $e->getMessage());
         }
@@ -1006,7 +1188,7 @@ PHP;
             // File::put(base_path("../appgenerate/lav-gen/app/Http/Controllers/Generate/{$controllerName}.php"), $content);
 
             // BASE Controller  (overwrite)
-            $basePath  = base_path("../appgenerate/lav-gen/app/Http/Controllers/Generate/{$controllerName}.php");
+            $basePath  = $this->backPath("app/Http/Controllers/Generate/{$controllerName}.php");
             $this->publishStub(
                 base_path('stubs/controller.base.stub'),
                 $basePath,
@@ -1023,7 +1205,7 @@ PHP;
             );
 
             // Override Controller (write-once)
-            $childPath = base_path("../appgenerate/lav-gen/app/Http/Controllers/Overrides/{$controllerName}.php");
+            $childPath = $this->backPath("app/Http/Controllers/Overrides/{$controllerName}.php");
             $this->publishStub(
                 base_path('stubs/controller.child.stub'),
                 $childPath,
@@ -1046,7 +1228,7 @@ PHP;
             $routePath = Str::kebab(Str::plural($table));
             $controllerName = ucfirst(Str::camel($entity)) . 'Controller';
             
-            $apiFile = base_path('../appgenerate/lav-gen/routes/api.php');
+            $apiFile = $this->backPath('routes/api.php');
             if (!File::exists($apiFile)) {
                 File::ensureDirectoryExists(dirname($apiFile));
                 File::put($apiFile, "<?php\n");
@@ -1160,8 +1342,8 @@ PHP;
 
         // 5) Tulis Export Class dari stub BARU (tetap pakai path stub milikmu)
         $this->publishStub(
-        base_path('stubs/export/export-class.stub'),
-        base_path("../appgenerate/lav-gen/app/Exports/{$entity}Export.php"),
+            base_path('stubs/export/export-class.stub'),
+            $this->backPath("app/Exports/{$entity}Export.php"),
         [
             'ENTITY'           => $entity,
             'TABLE'            => $table,
@@ -1232,12 +1414,14 @@ PHP;
             ],
         ];
 
-        $jsonPath = base_path("../appgenerate/lav-gen/resources/builder_schema");
+        $jsonPath = $this->backPath("resources/builder_schema");
         \File::ensureDirectoryExists($jsonPath);
         \File::put("$jsonPath/{$table}.json", json_encode($schema, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
     }
 
-    // func generate frontend
+    /**
+     * FRONTEND CODEGEN (Next).
+     */
     private function generateFrontend($table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts)
     {
         try {
@@ -1255,12 +1439,12 @@ PHP;
             $singularPascal = Str::studly($singularSnake); // NamaFile
             $singularHeadline = Str::headline($singularSnake); // Nama File
 
-            $folderApp = base_path("../appgenerate/next-gen/app/$singularKebab"); // folder app
-            $folderCreate = "$folderApp/create"; // folder app/create
-            $folderEdit = "$folderApp/edit/[id]"; // folder app/edit/id
-            $folderView = "$folderApp/view/[id]"; // folder app/view/id
-            $folderComp = base_path("../appgenerate/next-gen/components/$singularKebab"); // folder components
-            $folderForm = "$folderComp/form"; // folder form
+            $folderApp   = $this->frontPath("app/$singularKebab"); // folder app
+            $folderCreate= $this->frontPath("app/$singularKebab/create"); // folder app/create
+            $folderEdit  = $this->frontPath("app/$singularKebab/edit/[id]"); // folder app/edit/id
+            $folderView  = $this->frontPath("app/$singularKebab/view/[id]"); // folder app/view/id
+            $folderComp  = $this->frontPath("components/$singularKebab"); // folder components
+            $folderForm  = $this->frontPath("components/$singularKebab/form"); // folder form
 
             // cek dan create folder
             File::ensureDirectoryExists($folderApp);
@@ -1271,8 +1455,8 @@ PHP;
             File::ensureDirectoryExists($folderForm);
 
             // Publish runtime Frontend (sekali)
-            $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),  base_path("../appgenerate/next-gen/lib/actions.ts"));
-            $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),    base_path("../appgenerate/next-gen/components/actions/ActionBar.tsx"));
+            $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),  $this->frontPath("lib/actions.ts"));
+            $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),    $this->frontPath("components/actions/ActionBar.tsx"));
 
             // generate index (app/(nama-folder)/page.tsx)
             $indexTemplate = File::get(base_path('stubs/frontend/app/page-index.stub'));
