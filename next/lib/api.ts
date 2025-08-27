@@ -311,16 +311,19 @@ export async function fetchOptions(entity: string) {
   }));
 }
 
-export async function fetchProductsOnBuilder(path: string) {
-  const res = await fetch(`http://localhost:8080/api/${path}`);
+export async function fetchProductsOnBuilder(path: string, params: { status?: string }) {
+  const url = new URL(`${API_URL}/${path}`);
+  if (params.status) url.searchParams.set("status", params.status.toLowerCase());
+
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
   const json = await res.json();
 
   const arr: any[] = Array.isArray(json?.data) ? json.data : [];
 
   return arr.map((item: any) => ({
-    value: String(item.id),                 // UUID
+    value: String(item.id), // UUID
     label: String(item.product_name ?? ""), // pakai product_name
-    code : item.product_code ?? null,       // opsional, kalau mau dipakai
+    code: item.product_code ?? null, // opsional, kalau mau dipakai
     status: item.status ?? null,
   }));
 }
@@ -1409,4 +1412,25 @@ export async function forceDeleteProduct(id: string): Promise<void> {
     } catch {}
     throw new Error(msg || "Gagal menghapus permanen product");
   }
+}
+
+// template load api
+export async function fetchTemplateFrontend(
+  path: string,
+  params: { status?: string }
+) {
+  const url = new URL(`${API_URL}/${path}`);
+  if (params.status) url.searchParams.set("status", params.status.toLowerCase());
+
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  const json = await res.json();
+
+  const arr: any[] = Array.isArray(json?.data) ? json.data : [];
+
+  return arr.map((item: any) => ({
+    value: String(item.id), // UUID
+    label: String(item.template_name ?? ""), // pakai template_name
+    code: item.template_code ?? null, // opsional, kalau mau dipakai
+    status: item.status ?? null,
+  }));
 }

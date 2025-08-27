@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('field_categories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('crud_builder_id')->constrained('crud_builders')->onDelete('cascade');
+            $table->foreignId('crud_builder_id')->constrained('crud_builders')->restrictOnDelete();
             $table->string('nama_kategori');
             $table->timestamps();
         });

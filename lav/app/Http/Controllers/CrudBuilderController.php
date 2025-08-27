@@ -52,7 +52,7 @@ class CrudBuilderController extends Controller
         // 1. Validasi awal
         try {
             $validated = $request->validate([
-                'product_id' => 'nullable|uuid|exists:mst_products,id',
+                'product_id' => 'required|uuid|exists:mst_products,id',
                 'kategori_crud' => 'required|in:utama,pendukung',
                 'judul' => 'required|string',
                 'nama_tabel' => 'required|string|unique:crud_builders,nama_tabel',
@@ -301,7 +301,7 @@ class CrudBuilderController extends Controller
         // 1) VALIDASI
         try {
             $validated = $request->validate([
-                'product_id' => 'nullable|uuid|exists:mst_products,id',
+                'product_id' => 'required|uuid|exists:mst_products,id',
                 'kategori_crud' => 'required|in:utama,pendukung',
                 'judul' => 'required|string',
                 'nama_tabel' => 'required|string|unique:crud_builders,nama_tabel,' . $id,

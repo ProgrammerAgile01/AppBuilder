@@ -58,6 +58,7 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'template_frontend_id' => ['required', 'uuid', 'exists:mst_template_frontend,id'],
             'product_code' => [
                 'required',
                 'string',
@@ -85,6 +86,7 @@ class ProductController extends Controller
         $row = Product::withTrashed()->findOrFail($id);
 
         $validated = $request->validate([
+            'template_frontend_id' => ['required', 'uuid', 'exists:mst_template_frontend,id'],
             'product_code' => [
                 'required',
                 'string',

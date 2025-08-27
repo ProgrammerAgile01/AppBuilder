@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('card_layouts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('crud_builder_id')->constrained()->onDelete('cascade');
+            $table->foreignId('crud_builder_id')->constrained()->restrictOnDelete();
             $table->string('name')->default('Default Layout');
             $table->json('schema'); // Simpel & fleksibel: simpan seluruh konfigurasi ke JSON
             $table->boolean('is_default')->default(true);

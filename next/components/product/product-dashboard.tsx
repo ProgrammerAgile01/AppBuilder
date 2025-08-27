@@ -48,10 +48,17 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { API_URL, createData, updateData, deleteData } from "@/lib/api";
+import {
+  API_URL,
+  createData,
+  updateData,
+  deleteData,
+  fetchTemplateFrontend,
+} from "@/lib/api";
 
 interface Product {
   id: string;
+  template: string;
   productCode: string;
   productName: string;
   status: "Active" | "Inactive" | "Archived";
@@ -78,6 +85,7 @@ export function ProductDashboard() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
+    template: "",
     productCode: "",
     productName: "",
     status: "Active" as Product["status"],
@@ -93,6 +101,19 @@ export function ProductDashboard() {
   // ====== Confirm delete dialog state ======
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+
+  // load template
+  const [templates, setTemplates] = useState<
+    Array<{ value: string; label: string }>
+  >([]);
+
+  useEffect(() => {
+    fetchTemplateFrontend("template-frontend", { status: "active"})
+      .then(setTemplates)
+      .catch(() => {
+        console.log('error load template frontend')
+      });
+  }, []);
 
   // --- Fetch list dari API ---
   async function reload() {
@@ -111,6 +132,7 @@ export function ProductDashboard() {
         : [];
       const mapped: Product[] = arr.map((it) => ({
         id: String(it.id),
+        template: String(it.template_frontend_id),
         productCode: it.product_code,
         productName: it.product_name,
         status: toTitle(it.status) as Product["status"],
@@ -151,7 +173,11 @@ export function ProductDashboard() {
 
   async function handleCreateProduct() {
     try {
-      if (!formData.productCode || !formData.productName) {
+      if (
+        !formData.productCode ||
+        !formData.productName ||
+        !formData.template
+      ) {
         toast.error("Semua field harus diisi");
         return;
       }
@@ -166,6 +192,7 @@ export function ProductDashboard() {
       }
 
       const payload = {
+        template_frontend_id: formData.template,
         product_code: formData.productCode.toUpperCase(),
         product_name: formData.productName,
         status: toLower(formData.status),
@@ -174,7 +201,12 @@ export function ProductDashboard() {
       await createData("products", payload);
       toast.success("Product berhasil ditambahkan");
       setIsCreateDialogOpen(false);
-      setFormData({ productCode: "", productName: "", status: "Active" });
+      setFormData({
+        template: "",
+        productCode: "",
+        productName: "",
+        status: "Active",
+      });
       await reload();
     } catch (e: any) {
       toast.error(e?.message || "Gagal menambah product");
@@ -183,7 +215,12 @@ export function ProductDashboard() {
 
   async function handleEditProduct() {
     try {
-      if (!editingProduct || !formData.productCode || !formData.productName) {
+      if (
+        !editingProduct ||
+        !formData.productCode ||
+        !formData.productName ||
+        !formData.template
+      ) {
         toast.error("Semua field harus diisi");
         return;
       }
@@ -199,6 +236,7 @@ export function ProductDashboard() {
       }
 
       const payload = {
+        template_frontend_id: formData.template,
         product_code: formData.productCode.toUpperCase(),
         product_name: formData.productName,
         status: toLower(formData.status),
@@ -208,7 +246,12 @@ export function ProductDashboard() {
       toast.success("Product berhasil diperbarui");
       setIsEditDialogOpen(false);
       setEditingProduct(null);
-      setFormData({ productCode: "", productName: "", status: "Active" });
+      setFormData({
+        template: "",
+        productCode: "",
+        productName: "",
+        status: "Active",
+      });
       await reload();
     } catch (e: any) {
       toast.error(e?.message || "Gagal memperbarui product");
@@ -238,6 +281,7 @@ export function ProductDashboard() {
   const openEditDialog = (product: Product) => {
     setEditingProduct(product);
     setFormData({
+      template: product.template,
       productCode: product.productCode,
       productName: product.productName,
       status: product.status,
@@ -320,6 +364,7 @@ export function ProductDashboard() {
         : [];
       const mapped: Product[] = arr.map((it) => ({
         id: String(it.id),
+        template: String(it.template_frontend_id),
         productCode: it.product_code,
         productName: it.product_name,
         status: toTitle(it.status) as Product["status"],
@@ -432,6 +477,7 @@ export function ProductDashboard() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Product Code</TableHead>
+                          <TableHead>Template Frontend</TableHead>
                           <TableHead>Product Name</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
@@ -442,7 +488,11 @@ export function ProductDashboard() {
                             <TableCell className="font-mono">
                               {p.productCode}
                             </TableCell>
-                            <TableCell>{p.productName}</TableCell>
+                            <TableCell className="font-medium">{p.productName}</TableCell>
+                            <TableCell>
+                              {templates.find((t) => t.value === p.template)
+                                ?.label ?? p.template}
+                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
@@ -528,6 +578,33 @@ export function ProductDashboard() {
                       setFormData({ ...formData, productName: e.target.value })
                     }
                   />
+                </div>
+                <div>
+                  <Label htmlFor="template">Template Frontend</Label>
+                  <Select
+                    value={formData.template}
+                    onValueChange={(value: Product["template"]) =>
+                      setFormData({ ...formData, template: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map((template) => {
+                        return (
+                          <SelectItem
+                            key={template.value}
+                            value={template.value}
+                          >
+                            <div className="flex items-center gap-2">
+                              {template.label}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="status">Status</Label>
@@ -669,6 +746,7 @@ export function ProductDashboard() {
                 <TableRow>
                   <TableHead>Product Code</TableHead>
                   <TableHead>Product Name</TableHead>
+                  <TableHead>Template</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
@@ -683,6 +761,10 @@ export function ProductDashboard() {
                     </TableCell>
                     <TableCell className="font-medium">
                       {product.productName}
+                    </TableCell>
+                    <TableCell>
+                      {templates.find((t) => t.value === product.template)
+                        ?.label ?? product.template}
                     </TableCell>
                     <TableCell>{getStatusBadge(product.status)}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -761,6 +843,31 @@ export function ProductDashboard() {
                   setFormData({ ...formData, productName: e.target.value })
                 }
               />
+            </div>
+            <div>
+              <Label htmlFor="editTemplate">Template Frontend</Label>
+              <Select
+                id="editTemplate"
+                value={formData.template}
+                onValueChange={(value: Product["template"]) =>
+                  setFormData({ ...formData, template: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((template) => {
+                    return (
+                      <SelectItem key={template.value} value={template.value}>
+                        <div className="flex items-center gap-2">
+                          {template.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="editStatus">Status</Label>

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('table_layouts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('crud_builder_id')->constrained()->onDelete('cascade');
+            $table->foreignId('crud_builder_id')->constrained()->restrictOnDelete();
             $table->string('layout_name_id')->default('default');
             $table->string('layout_name_en')->nullable();
             $table->boolean('show_actions')->default(true);

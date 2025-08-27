@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('crud_fields', function (Blueprint $table) {
-            $table->foreignId('field_category_id')->nullable()->after('crud_builder_id')->constrained('field_categories')->onDelete('set null');
+            $table->foreignId('field_category_id')->nullable()->after('crud_builder_id')->constrained('field_categories')->restrictOnDelete();
         });
     }
 

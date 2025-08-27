@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('column_contents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('table_column_id')->constrained()->onDelete('cascade');
+            $table->foreignId('table_column_id')->constrained()->restrictOnDelete();
             $table->string('source_column');
             $table->string('display_type'); // text, image, badge, icon, etc.
             $table->string('label_id')->nullable();

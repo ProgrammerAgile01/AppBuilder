@@ -14,7 +14,7 @@ return new class extends Migration {
             // FK ke mst_products(id)
             $table->foreign('product_id')
                   ->references('id')->on('mst_products')
-                  ->nullOnDelete(); // ON DELETE SET NULL
+                  ->restrictOnDelete();
         });
     }
 

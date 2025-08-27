@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('crud_statistics', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('crud_builder_id')->constrained()->onDelete('cascade');
+            $table->foreignId('crud_builder_id')->constrained()->restrictOnDelete();
             $table->string('judul_statistik_id');
             $table->string('judul_statistik_en')->nullable();
             $table->string('icon')->nullable();

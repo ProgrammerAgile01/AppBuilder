@@ -518,7 +518,7 @@ export function TemplateFrontendDashboard() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="templateCode">template Code</Label>
+                  <Label htmlFor="templateCode">Template Code</Label>
                   <Input
                     id="templateCode"
                     placeholder="NATURAL"

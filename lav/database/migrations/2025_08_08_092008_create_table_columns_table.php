@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('table_columns', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('table_layout_id')->constrained()->onDelete('cascade');
+            $table->foreignId('table_layout_id')->constrained()->restrictOnDelete();
             $table->string('label_id');
             $table->string('label_en')->nullable();
             $table->string('alignment')->default('left');

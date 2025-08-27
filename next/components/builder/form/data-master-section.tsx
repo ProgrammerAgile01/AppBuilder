@@ -94,7 +94,7 @@ export function DataMasterSection({
   >([]);
 
   useEffect(() => {
-    fetchProductsOnBuilder("products")
+    fetchProductsOnBuilder("products", { status: "active" })
       .then(setProducts)
       .catch(() => {
         toast({
