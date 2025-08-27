@@ -4,38 +4,34 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
+use Str;
 
-class Product extends Model
+class TemplateFrontend extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'mst_products';
+    protected $table = 'mst_template_frontend';
     protected $primaryKey = 'id';
     public $incrementing = false;
     protected $keyType = 'string';
-
-    // pastikan template_id & template_code mass-assignable
     protected $fillable = [
-        'product_code',
-        'product_name',
-        'status',
-        'db_name',
-        'template_id',
         'template_code',
+        'template_name',
+        'status',
     ];
 
     protected static function booted()
     {
-        static::creating(function (Product $model) {
+        static::creating(function (TemplateFrontend $model) {
             if (empty($model->id)) {
                 $model->id = (string) Str::uuid();
             }
         });
     }
 
-    public function template()
+    // relasi ke product
+    public function products()
     {
-        return $this->belongsTo(TemplateFrontend::class, 'template_id', 'id');
+        return $this->hasMany(Product::class);
     }
 }

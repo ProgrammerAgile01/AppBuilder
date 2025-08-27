@@ -415,7 +415,6 @@ export async function fetchProduct(): Promise<Product[]> {
   return rows.map(mapProduct);
 }
 
-
 /* =========================
    MENUS (Tree + Trash)
    ========================= */
@@ -425,7 +424,8 @@ export async function fetchMenus(opts?: {
 }) {
   const url = new URL(`${API_URL}/menus`);
   url.searchParams.set("trash", opts?.trash ?? "none");
-  if (opts?.product_id) url.searchParams.set("product_id", String(opts.product_id));
+  if (opts?.product_id)
+    url.searchParams.set("product_id", String(opts.product_id));
 
   const res = await fetch(url.toString(), {
     cache: "no-store",
@@ -544,12 +544,13 @@ export async function fetchCrudBuilders(
 export async function generateFrontendMenu(opts?: {
   groupId?: string;
   moduleId?: string;
-  productId?: string;   // <-- TAMBAH INI
+  productId?: string; // <-- TAMBAH INI
 }) {
   const url = new URL(`${API_URL}/generate-menu`);
-  if (opts?.groupId)  url.searchParams.set("group_id",  String(opts.groupId));
+  if (opts?.groupId) url.searchParams.set("group_id", String(opts.groupId));
   if (opts?.moduleId) url.searchParams.set("module_id", String(opts.moduleId));
-  if (opts?.productId) url.searchParams.set("product_id", String(opts.productId)); // <-- TAMBAH INI
+  if (opts?.productId)
+    url.searchParams.set("product_id", String(opts.productId)); // <-- TAMBAH INI
 
   const res = await fetch(url.toString(), { method: "POST" });
   if (!res.ok) {
@@ -979,9 +980,7 @@ function toSnakePayload(input: Record<string, any>) {
       case "crud_menu_id":
       case "is_active":
       case "order_number":
-        out[k] = k.endsWith("_id")
-          ? toNumberIfNumeric(toNullIfEmptyId(v))
-          : v;
+        out[k] = k.endsWith("_id") ? toNumberIfNumeric(toNullIfEmptyId(v)) : v;
         break;
 
       case "trial_available":
@@ -990,7 +989,7 @@ function toSnakePayload(input: Record<string, any>) {
 
       case "trial_days":
         // kalau trial_available false -> kirim null
-        out[k] = input["trial_available"] ? (v ?? null) : null;
+        out[k] = input["trial_available"] ? v ?? null : null;
         break;
 
       default:
@@ -1109,7 +1108,9 @@ export async function deleteFitur(id: string | number): Promise<void> {
 }
 
 /** Toggle aktif/non (POST /api/fitur/{id}/toggle) */
-export async function toggleFitur(id: string | number): Promise<FeatureTreeNode> {
+export async function toggleFitur(
+  id: string | number
+): Promise<FeatureTreeNode> {
   const res = await fetch(`${API_URL}/fitur/${id}/toggle`, { method: "POST" });
   await _throwIfNotOk(res);
   const json = await res.json();
@@ -1117,7 +1118,9 @@ export async function toggleFitur(id: string | number): Promise<FeatureTreeNode>
 }
 
 /** Restore (POST /api/fitur/{id}/restore) */
-export async function restoreFitur(id: string | number): Promise<FeatureTreeNode> {
+export async function restoreFitur(
+  id: string | number
+): Promise<FeatureTreeNode> {
   const res = await fetch(`${API_URL}/fitur/${id}/restore`, { method: "POST" });
   await _throwIfNotOk(res);
   const json = await res.json();
@@ -1139,6 +1142,57 @@ export async function fetchDeletedFiturTree(productId?: string | number) {
   await _throwIfNotOk(res);
   const json = await res.json();
   return _extractArray(json).map(_mapNode);
+}
+/* ========== Trash box & restore/force ========== */
+
+export interface TrashBoxResponse {
+  success: boolean;
+  totals: {
+    all: number;
+    category: number;
+    feature: number;
+    subfeature: number;
+  };
+  items: {
+    category: FeatureTreeNode[];
+    feature: FeatureTreeNode[];
+    subfeature: FeatureTreeNode[];
+  };
+}
+
+export async function fetchTrashBoxFeatures(params?: {
+  product_id?: string | number;
+}): Promise<TrashBoxResponse> {
+  const q = new URLSearchParams();
+  if (params?.product_id) q.set("product_id", String(params.product_id));
+
+  const res = await fetch(`${API_URL}/fitur/trash-box?${q.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const json = await res.json().catch(() => ({}));
+  // Normalisasi agar selalu punya shape {success, totals, items}
+  return {
+    success: !!json?.success || true,
+    totals: json?.totals ?? { all: 0, category: 0, feature: 0, subfeature: 0 },
+    items: json?.items ??
+      json?.data ?? { category: [], feature: [], subfeature: [] },
+  };
+}
+/* ========== Generate fitur per product ========== */
+
+export async function generateFiturForProduct(
+  productId: string | number
+): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const res = await fetch(`${API_URL}/fitur/generate/${productId}`, {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return (await res.json().catch(() => ({}))) as any;
 }
 
 // =================== MENUS LOOKUP (Dropdown relasi langsung ke menus) ===================
@@ -1381,10 +1435,12 @@ export function collectSelectionFromTrees(
 // === PRODUCTS with trash support ===
 
 // List products, dukung opsi trash= "none" | "with" | "only"
+type TrashMode = "none" | "with" | "only";
+
 export async function fetchProducts(opts?: {
   search?: string;
   status?: "active" | "inactive" | "archived";
-  trash?: "none" | "with" | "only";
+  trash?: TrashMode;
 }) {
   const url = new URL(`${API_URL}/products`);
   if (opts?.search) url.searchParams.set("search", opts.search);
@@ -1393,30 +1449,71 @@ export async function fetchProducts(opts?: {
     url.searchParams.set("trash", opts.trash);
 
   const res = await fetch(url.toString(), {
-    cache: "no-store",
     headers: { Accept: "application/json" },
+    cache: "no-store",
   });
+
   if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Gagal mengambil products: ${res.status} ${txt}`);
+    let msg = await res.text().catch(() => "");
+    try {
+      const j = JSON.parse(msg);
+      msg = j.message || msg;
+    } catch {}
+    throw new Error(msg || `HTTP ${res.status}`);
   }
-  const json = await res.json().catch(() => ({}));
-  // Kembalikan array polos + meta jika ada
+
+  const text = await res.text();
+  const json = text
+    ? (() => {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return {};
+        }
+      })()
+    : {};
   return {
-    data: Array.isArray(json?.data)
-      ? json.data
+    data: Array.isArray((json as any)?.data)
+      ? (json as any).data
       : Array.isArray(json)
-      ? json
+      ? (json as any)
       : [],
-    meta: json?.meta || {},
+    meta: (json as any)?.meta || {},
   };
 }
 
-// Soft delete sudah otomatis via deleteData("products", id)
+export async function createProduct(payload: {
+  product_code: string;
+  product_name: string;
+  status?: "active" | "inactive" | "archived";
+  db_name?: string;
+  template_id?: string;
+}) {
+  return createData("products", payload);
+}
+
+export async function updateProduct(
+  id: string,
+  payload: {
+    product_code: string;
+    product_name: string;
+    status?: "active" | "inactive" | "archived";
+    db_name?: string;
+    template_id?: string | null; // null → putuskan relasi
+  }
+) {
+  return updateData("products", id, payload);
+}
+
+export async function deleteProduct(id: string) {
+  return deleteData("products", id); // soft delete
+}
 
 export async function restoreProduct(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/products/${id}/restore`, {
     method: "POST",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
   });
   if (!res.ok) {
     let msg = await res.text().catch(() => "");
@@ -1424,13 +1521,15 @@ export async function restoreProduct(id: string): Promise<void> {
       const j = JSON.parse(msg);
       msg = j.message || msg;
     } catch {}
-    throw new Error(msg || "Gagal memulihkan product");
+    throw new Error(msg || `HTTP ${res.status}`);
   }
 }
 
 export async function forceDeleteProduct(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/products/${id}/force`, {
     method: "DELETE",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
   });
   if (!res.ok) {
     let msg = await res.text().catch(() => "");
@@ -1438,6 +1537,43 @@ export async function forceDeleteProduct(id: string): Promise<void> {
       const j = JSON.parse(msg);
       msg = j.message || msg;
     } catch {}
-    throw new Error(msg || "Gagal menghapus permanen product");
+    throw new Error(msg || `HTTP ${res.status}`);
   }
+}
+
+// ============================
+// TEMPLATE APIs (untuk dropdown)
+// ============================
+export async function fetchTemplateOptions(): Promise<
+  { value: string; label: string }[]
+> {
+  const res = await fetch(`${API_URL}/template-frontend`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    let msg = await res.text().catch(() => "");
+    try {
+      const j = JSON.parse(msg);
+      msg = j.message || msg;
+    } catch {}
+    throw new Error(msg || `HTTP ${res.status}`);
+  }
+
+  const text = await res.text();
+  const json: any = text
+    ? (() => {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return {};
+        }
+      })()
+    : {};
+  const arr: any[] = Array.isArray(json?.data) ? json.data : [];
+  return arr.map((t) => ({
+    value: String(t.id),
+    label: `${t.template_code} — ${t.template_name}`,
+  }));
 }

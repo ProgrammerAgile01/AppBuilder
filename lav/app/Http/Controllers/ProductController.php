@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Models\TemplateFrontend;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
@@ -11,9 +12,9 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $q = Product::query();
+        $q = Product::with('template');
 
-        // trash filter: none (default) | with | only
+        // trash filter: none|with|only
         $trash = $request->query('trash', 'none');
         if ($trash === 'with') {
             $q->withTrashed();
@@ -34,8 +35,6 @@ class ProductController extends Controller
         }
 
         $rows = $q->orderByDesc('updated_at')->get();
-
-        // (opsional) kirim count trash untuk badge/metrics jika nanti dibutuhkan
         $trashedCount = Product::onlyTrashed()->count();
 
         return response()->json([
@@ -49,7 +48,7 @@ class ProductController extends Controller
 
     public function show(string $id)
     {
-        $row = Product::withTrashed()->findOrFail($id);
+        $row = Product::withTrashed()->with('template')->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -61,29 +60,30 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'product_code' => [
-                'required',
-                'string',
-                'max:64',
+                'required', 'string', 'max:64',
                 Rule::unique('mst_products', 'product_code')->whereNull('deleted_at'),
             ],
             'product_name' => ['required', 'string', 'max:160'],
-            // status tetap opsional
-            'status' => ['nullable', Rule::in(['active', 'inactive', 'archived'])],
-            // db_name opsional (UI lama tidak mengirim); jika ada, validasi
-            'db_name' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_]+$/'],
+            'status'       => ['nullable', Rule::in(['active', 'inactive', 'archived'])],
+            'db_name'      => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_]+$/'],
+            'template_id'  => ['nullable', 'uuid', Rule::exists('mst_template_frontend', 'id')->whereNull('deleted_at')],
         ]);
 
         $validated['status'] = $validated['status'] ?? 'active';
 
-        // Jika db_name tidak dikirim, generate dari product_code
+        // handle db_name
         $dbName = $request->input('db_name');
         if (empty($dbName)) {
             $dbName = $this->generateUniqueDbName($validated['product_code']);
         } else {
-            // normalisasi ke format snake (tanpa memaksa lowercase jika tidak diinginkan)
             $dbName = substr(Str::slug($dbName, '_'), 0, 60);
-            // pastikan unik juga
             $dbName = $this->ensureDbNameUnique($dbName);
+        }
+
+        // siapkan template_code bila ada template_id
+        $templateCode = null;
+        if (!empty($validated['template_id'])) {
+            $templateCode = TemplateFrontend::where('id', $validated['template_id'])->value('template_code');
         }
 
         $row = Product::create([
@@ -91,7 +91,9 @@ class ProductController extends Controller
             'product_name' => $validated['product_name'],
             'status'       => $validated['status'],
             'db_name'      => $dbName,
-        ]);
+            'template_id'  => $validated['template_id'] ?? null,
+            'template_code'=> $templateCode, // salin kode template (denormalized)
+        ])->load('template');
 
         return response()->json([
             'success' => true,
@@ -106,30 +108,35 @@ class ProductController extends Controller
 
         $validated = $request->validate([
             'product_code' => [
-                'required',
-                'string',
-                'max:64',
-                Rule::unique('mst_products', 'product_code')
-                    ->ignore($row->id, 'id')
-                    ->whereNull('deleted_at'),
+                'required', 'string', 'max:64',
+                Rule::unique('mst_products', 'product_code')->ignore($row->id, 'id')->whereNull('deleted_at'),
             ],
             'product_name' => ['required', 'string', 'max:160'],
-            'status' => ['nullable', Rule::in(['active', 'inactive', 'archived'])],
-            'db_name' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_]+$/'],
+            'status'       => ['nullable', Rule::in(['active', 'inactive', 'archived'])],
+            'db_name'      => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9_]+$/'],
+            'template_id'  => ['nullable', 'uuid', Rule::exists('mst_template_frontend', 'id')->whereNull('deleted_at')],
         ]);
 
-        // Tentukan db_name baru:
-        // - Jika dikirim di request → pakai (dinormalisasi & dipastikan unik)
-        // - Jika tidak dikirim → pertahankan nilai lama
+        // db_name
         $newDbName = $request->input('db_name');
         if ($newDbName !== null && $newDbName !== '') {
             $newDbName = substr(Str::slug($newDbName, '_'), 0, 60);
-            // jika berubah dari yang lama, pastikan unik
             if ($newDbName !== $row->db_name) {
                 $newDbName = $this->ensureDbNameUnique($newDbName, $row->id);
             }
         } else {
-            $newDbName = $row->db_name; // keep existing (tidak memaksa sinkron dengan product_code)
+            $newDbName = $row->db_name;
+        }
+
+        // Tetapkan template_code sesuai template_id baru
+        $templateCode = $row->template_code; // default: pertahankan
+        if (array_key_exists('template_id', $validated)) {
+            if (!empty($validated['template_id'])) {
+                $templateCode = TemplateFrontend::where('id', $validated['template_id'])->value('template_code');
+            } else {
+                // FE bisa kirim kosong → lepas relasi
+                $templateCode = null;
+            }
         }
 
         $payload = [
@@ -137,6 +144,8 @@ class ProductController extends Controller
             'product_name' => $validated['product_name'],
             'status'       => $validated['status'] ?? $row->status,
             'db_name'      => $newDbName,
+            'template_id'  => $validated['template_id'] ?? null,
+            'template_code'=> $templateCode,
         ];
 
         $row->update($payload);
@@ -144,22 +153,20 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product updated.',
-            'data' => $row,
+            'data' => $row->load('template'),
         ]);
     }
 
     public function destroy(string $id)
     {
         $row = Product::findOrFail($id);
-        $row->delete(); // soft delete
+        $row->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Product moved to trash.',
         ]);
     }
-
-    // === extra endpoints untuk modal "Sampah" ===
 
     public function restore(string $id)
     {
@@ -169,7 +176,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product restored.',
-            'data' => $row,
+            'data' => $row->load('template'),
         ]);
     }
 
@@ -190,7 +197,6 @@ class ProductController extends Controller
 
     /**
      * Generate db_name unik dari product_code.
-     * Contoh: "RENTVIX PRO" -> "rentvix_pro", maksimal 60 char.
      */
     protected function generateUniqueDbName(string $productCode, ?string $ignoreId = null): string
     {
@@ -199,8 +205,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Pastikan db_name unik (termasuk data yang sudah soft-delete).
-     * Jika sudah ada, tambahkan suffix _2, _3, dst.
+     * Pastikan db_name unik (termasuk soft-deleted).
      */
     protected function ensureDbNameUnique(string $candidate, ?string $ignoreId = null): string
     {

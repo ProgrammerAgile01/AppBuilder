@@ -9,7 +9,7 @@ return new class extends Migration {
         Schema::create('access_control_matrix', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_level_id')->constrained('level_user')->references('id')->onDelete('cascade');
-            $table->foreignId('menu_id')->constrained('menu_id')->references('id')->onDelete('cascade');
+            // $table->foreignId('menu_id')->constrained('menu_id')->references('id')->onDelete('cascade');
             $table->boolean('view')->nullable();
             $table->boolean('add')->nullable();
             $table->boolean('edit')->nullable();

@@ -61,7 +61,7 @@ import {
 
 import { toast } from "sonner";
 
-// ===== API (gunakan file api.ts final yang sudah diberikan) =====
+// ===== API (versi final) =====
 import {
   API_URL,
   listFitur,
@@ -71,6 +71,10 @@ import {
   deleteFitur,
   toggleFitur,
   fetchCrudMenusForProduct,
+  restoreFitur,
+  forceDeleteFitur,
+  fetchTrashBoxFeatures,
+  generateFiturForProduct,
   type FeatureTreeNode,
   type CrudMenuOption,
 } from "@/lib/api";
@@ -138,18 +142,16 @@ const toUIParent = (n: FeatureTreeNode): FeatureParent => ({
   code: n.feature_code ?? n.code ?? "",
   description: n.description ?? "",
   price_addon:
-    typeof n.price_addon === "number"
-      ? n.price_addon
-      : n.price_addon == null
+    typeof n.order_number === "number" || typeof n.order_number === "string"
       ? 0
-      : Number(n.price_addon),
-  trial_available: !!n.trial_available,
+      : 0, // (tidak tersedia di API read tree umum; tetap dipertahankan supaya UI tidak berubah)
+  trial_available: !!(n as any).trial_available,
   trial_days:
-    n.trial_days == null
+    (n as any).trial_days == null
       ? 0
-      : typeof n.trial_days === "number"
-      ? n.trial_days
-      : Number(n.trial_days),
+      : typeof (n as any).trial_days === "number"
+      ? (n as any).trial_days
+      : Number((n as any).trial_days),
   status: n.is_active ? "active" : "hidden",
   order:
     n.order_number == null
@@ -173,7 +175,7 @@ const toUIChild = (n: FeatureTreeNode): FeatureChild => ({
       ? ""
       : typeof n.crud_menu_id === "number"
       ? String(n.crud_menu_id)
-      : n.crud_menu_id,
+      : String(n.crud_menu_id),
   description: n.description ?? "",
   status: n.is_active ? "active" : "hidden",
   order:
@@ -241,6 +243,27 @@ export function AturFiturDashboard() {
 
   const [deleteParentId, setDeleteParentId] = useState<string | null>(null);
   const [deleteChildId, setDeleteChildId] = useState<string | null>(null);
+
+  // Sampah dialog
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashData, setTrashData] = useState<{
+    feature: FeatureTreeNode[];
+    subfeature: FeatureTreeNode[];
+    category: FeatureTreeNode[];
+    totals: {
+      all: number;
+      feature: number;
+      subfeature: number;
+      category: number;
+    };
+  }>({
+    feature: [],
+    subfeature: [],
+    category: [],
+    totals: { all: 0, feature: 0, subfeature: 0, category: 0 },
+  });
+  const [trashTab, setTrashTab] = useState<"root" | "child" | "all">("root");
 
   // Form states
   const [parentForm, setParentForm] = useState({
@@ -517,7 +540,7 @@ export function AturFiturDashboard() {
         return cp;
       });
       setDeleteParentId(null);
-      toast.success("Berhasil dihapus.");
+      toast.success("Dipindahkan ke Sampah.");
     } catch (e: any) {
       toast.error(e?.message || "Terjadi kesalahan. Coba lagi.");
     }
@@ -571,6 +594,79 @@ export function AturFiturDashboard() {
       toast.success("Status diperbarui.");
     } catch (e: any) {
       toast.error(e?.message || "Terjadi kesalahan. Coba lagi.");
+    }
+  };
+
+  // ======================
+  // Sampah: load/restore/remove-permanent
+  // ======================
+
+  const openTrash = async () => {
+    if (!selectedProduct) {
+      toast.message("Pilih produk dulu.");
+      return;
+    }
+    setTrashOpen(true);
+    setTrashLoading(true);
+    try {
+      const resp = await fetchTrashBoxFeatures({
+        product_id: selectedProduct.id,
+      });
+      setTrashData({
+        feature: resp.items.feature || [],
+        subfeature: resp.items.subfeature || [],
+        category: resp.items.category || [],
+        totals: resp.totals,
+      });
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal memuat Sampah fitur");
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const handleRestore = async (id: string) => {
+    try {
+      await restoreFitur(id);
+      toast.success("Dipulihkan.");
+      // refresh sampah
+      await openTrash();
+      // refresh list aktif
+      if (selectedProduct) {
+        await handleProductChange(selectedProduct);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal restore");
+    }
+  };
+
+  const handleForceDelete = async (id: string) => {
+    try {
+      await forceDeleteFitur(id);
+      toast.success("Dihapus permanen.");
+      await openTrash();
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal hapus permanen");
+    }
+  };
+
+  // ======================
+  // Generate fitur per produk (auto migrate + seeder)
+  // ======================
+
+  const handleGenerateFitur = async () => {
+    if (!selectedProduct) {
+      toast.message("Pilih produk terlebih dahulu.");
+      return;
+    }
+    try {
+      toast.loading("Memproses generate fitur...", { id: "gen" });
+      const res = await generateFiturForProduct(selectedProduct.id);
+      toast.success(res?.message || "Generate berhasil.", { id: "gen" });
+      // reload list
+      await handleProductChange(selectedProduct);
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal generate fitur", { id: "gen" });
     }
   };
 
@@ -817,12 +913,30 @@ export function AturFiturDashboard() {
               </Select>
 
               {selectedProduct && (
-                <Input
-                  placeholder="Cari fitur..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-64"
-                />
+                <>
+                  <Input
+                    placeholder="Cari fitur..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-64"
+                  />
+
+                  {/* Tombol Sampah */}
+                  <Button
+                    variant="outline"
+                    className="rounded-lg"
+                    onClick={openTrash}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Sampah
+                  </Button>
+
+                  {/* Tombol Generate Fitur */}
+                  <Button className="rounded-lg" onClick={handleGenerateFitur}>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Generate Fitur
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -1908,7 +2022,8 @@ export function AturFiturDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Fitur Parent</AlertDialogTitle>
             <AlertDialogDescription>
-              Hapus fitur parent ini? Semua child terkait akan ikut terhapus.
+              Hapus fitur parent ini? Semua child terkait akan ikut terhapus
+              (dipindah ke Sampah).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1934,7 +2049,7 @@ export function AturFiturDashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Fitur Child</AlertDialogTitle>
             <AlertDialogDescription>
-              Hapus fitur child ini?
+              Hapus fitur child ini? Item akan dipindahkan ke Sampah.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1948,6 +2063,211 @@ export function AturFiturDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ======= Dialog Sampah ======= */}
+      <Dialog open={trashOpen} onOpenChange={setTrashOpen}>
+        <DialogContent className="sm:max-w-[720px]">
+          <DialogHeader className="flex flex-row items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4" />
+              Sampah Fitur
+              <Badge variant="secondary" className="ml-2">
+                {trashData.totals.all} item
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Tabs
+              value={trashTab}
+              onValueChange={(v) => setTrashTab((v as any) ?? "root")}
+              className="w-full"
+            >
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="root" className="w-full">
+                  Parent ({trashData.totals.feature})
+                </TabsTrigger>
+                <TabsTrigger value="child" className="w-full">
+                  Child ({trashData.totals.subfeature})
+                </TabsTrigger>
+                <TabsTrigger value="all" className="w-full">
+                  Semua ({trashData.totals.all})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="root" className="m-0">
+                {trashLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : trashData.feature.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Trash2 className="h-6 w-6 mx-auto mb-2" />
+                    Tidak ada fitur parent yang dihapus
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {trashData.feature.map((it) => (
+                      <div
+                        key={String(it.id)}
+                        className="p-3 rounded-lg border flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Folder className="h-4 w-4 text-blue-600" />
+                          <div className="truncate">
+                            <div className="font-medium truncate">
+                              {it.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-mono truncate">
+                              {it.feature_code}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRestore(String(it.id))}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleForceDelete(String(it.id))}
+                          >
+                            Hapus Permanen
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="child" className="m-0">
+                {trashLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : trashData.subfeature.length === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Trash2 className="h-6 w-6 mx-auto mb-2" />
+                    Tidak ada fitur child yang dihapus
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {trashData.subfeature.map((it) => (
+                      <div
+                        key={String(it.id)}
+                        className="p-3 rounded-lg border flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ComponentIcon className="h-4 w-4 text-green-600" />
+                          <div className="truncate">
+                            <div className="font-medium truncate">
+                              {it.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-mono truncate">
+                              {it.feature_code}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRestore(String(it.id))}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleForceDelete(String(it.id))}
+                          >
+                            Hapus Permanen
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="all" className="m-0">
+                {trashLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-14 w-full" />
+                    ))}
+                  </div>
+                ) : trashData.totals.all === 0 ? (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Trash2 className="h-6 w-6 mx-auto mb-2" />
+                    Sampah kosong
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {[
+                      ...trashData.feature,
+                      ...trashData.subfeature,
+                      ...trashData.category,
+                    ].map((it) => (
+                      <div
+                        key={String(it.id)}
+                        className="p-3 rounded-lg border flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {it.type === "subfeature" ? (
+                            <ComponentIcon className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Folder className="h-4 w-4 text-blue-600" />
+                          )}
+                          <div className="truncate">
+                            <div className="font-medium truncate">
+                              {it.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-mono truncate">
+                              {it.feature_code}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRestore(String(it.id))}
+                          >
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleForceDelete(String(it.id))}
+                          >
+                            Hapus Permanen
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrashOpen(false)}>
+              Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

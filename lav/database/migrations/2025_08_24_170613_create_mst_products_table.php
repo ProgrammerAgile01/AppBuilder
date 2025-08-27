@@ -10,12 +10,22 @@ return new class extends Migration {
     {
         Schema::create('mst_products', function (Blueprint $table) {
             $table->uuid('id')->primary();
+
             $table->string('product_code', 64)->unique();
             $table->string('product_name', 160);
-            $table->string('db_name',60);
-            $table->enum('status', ['active','inactive','archived'])->default('active');
+
+            // relasi ke mst_template_frontend (UUID)
+            $table->foreignUuid('template_id')
+                  ->nullable()
+                  ->constrained('mst_template_frontend')
+                  ->nullOnDelete();
+ $table->string('template_code', 255);
+            $table->string('db_name', 60);
+
+            $table->enum('status', ['active', 'inactive', 'archived'])->default('active');
+
             $table->timestamps();
-            $table->softDeletes(); // <— penting: deleted_at
+            $table->softDeletes(); // deleted_at
         });
     }
 

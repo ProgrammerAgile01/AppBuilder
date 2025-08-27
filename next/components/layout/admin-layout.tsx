@@ -52,6 +52,13 @@ const navigation = [
     current: false,
   },
   {
+    name: "Template Frontend",
+    href: "/admin/template-frontend",
+    icon: Layers,
+    description: "Template Frontend System",
+    badge: null,
+  },
+  {
     name: "Product",
     href: "/admin/product",
     icon: Palette,
@@ -81,7 +88,7 @@ const navigation = [
     description: "Atur Fitur System",
     badge: "New",
   },
- 
+
   {
     name: "Users",
     href: "/admin/users",

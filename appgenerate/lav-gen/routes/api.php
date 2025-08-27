@@ -11,3 +11,7 @@ Route::apiResource('level_users', App\Http\Controllers\Generate\LevelUserControl
 Route::apiResource('user_managements', App\Http\Controllers\Generate\UserManagementController::class);
 Route::apiResource('vehicles', App\Http\Controllers\Generate\VehiclesController::class);
 Route::apiResource('access_control_matrices', App\Http\Controllers\Generate\AccessControlMatrixController::class);
+
+
+Route::get('fitur/tree', [\App\Http\Controllers\Generate\FeatureBuilderController::class, 'index']);
+Route::apiResource('fitur', \App\Http\Controllers\Generate\FeatureBuilderController::class);

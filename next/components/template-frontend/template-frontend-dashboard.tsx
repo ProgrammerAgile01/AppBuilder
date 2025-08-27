@@ -47,35 +47,16 @@ import {
   Users,
   RotateCcw,
 } from "lucide-react";
+import { API_URL, createData, updateData, deleteData } from "@/lib/api";
 import { toast } from "sonner";
-import {
-  fetchProducts,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  restoreProduct,
-  forceDeleteProduct,
-  fetchTemplateOptions,
-} from "@/lib/api"; // gunakan fungsi baru di api.ts
 
-// ===== Types =====
-export type FeatureStatus = "Active" | "Inactive" | "Archived";
-
-interface TemplateLite {
+interface TemplateFrontend {
   id: string;
-  template_code: string;
-  template_name: string;
-}
-
-interface Product {
-  id: string;
-  productCode: string;
-  productName: string;
-  status: FeatureStatus;
+  templateCode: string;
+  templateName: string;
+  status: "Active" | "Inactive" | "Archived";
   createdAt: string;
   updatedAt: string;
-  dbName?: string;
-  template?: TemplateLite | null;
 }
 
 // Helper status mapping
@@ -86,236 +67,198 @@ const toTitle = (s: string) =>
     ? "Inactive"
     : s === "archived"
     ? "Archived"
-    : (s as FeatureStatus) ?? "Active";
+    : s ?? "Active";
+const toLower = (s: TemplateFrontend["status"]) => s.toLowerCase();
 
-const toLower = (s: FeatureStatus) =>
-  s === "Active" ? "active" : s === "Inactive" ? "inactive" : "archived";
-
-// helper db_name dari product code → snake_case (maks 60 char)
-function toDbNameSuggestion(src: string) {
-  const s = (src || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gi, "_")
-    .replace(/^_+|_+$/g, "")
-    .replace(/_+/g, "_");
-  return s.slice(0, 60) || "";
-}
-
-// validasi ringan db_name
-function isValidDbName(s: string) {
-  return /^[A-Za-z0-9_]{1,60}$/.test(s);
-}
-
-export function ProductDashboard() {
-  const [products, setProducts] = useState<Product[]>([]);
+export function TemplateFrontendDashboard() {
+  const [templateFrontend, setTemplateFrontend] = useState<TemplateFrontend[]>(
+    []
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-
+  const [editingTemplateFrontend, setEditingTemplateFrontend] =
+    useState<TemplateFrontend | null>(null);
   const [formData, setFormData] = useState({
-    productCode: "",
-    productName: "",
-    status: "Active" as FeatureStatus,
-    dbName: "",
-    templateId: "", // ← id template terpilih
+    templateCode: "",
+    templateName: "",
+    status: "Active" as TemplateFrontend["status"],
   });
-
-  // Template dropdown options
-  const [templateOptions, setTemplateOptions] = useState<
-    { value: string; label: string }[]
-  >([]);
 
   // ====== Trash modal & badge state ======
   const [isTrashOpen, setIsTrashOpen] = useState(false);
-  const [trashed, setTrashed] = useState<Product[]>([]);
+  const [trashed, setTrashed] = useState<TemplateFrontend[]>([]);
   const [trashCount, setTrashCount] = useState<number>(0);
   const [loadingTrash, setLoadingTrash] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   // ====== Confirm delete dialog state ======
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [deletingTemplateFrontend, setDeletingTemplateFrontend] =
+    useState<TemplateFrontend | null>(null);
 
   // --- Fetch list dari API ---
   async function reload() {
     try {
-      const { data, meta } = await fetchProducts();
-      const mapped: Product[] = data.map((it: any) => ({
+      const url = new URL(`${API_URL}/template-frontend`);
+      const res = await fetch(url.toString(), {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      const arr: any[] = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json)
+        ? json
+        : [];
+      const mapped: TemplateFrontend[] = arr.map((it) => ({
         id: String(it.id),
-        productCode: it.product_code,
-        productName: it.product_name,
-        status: toTitle(it.status) as FeatureStatus,
+        templateCode: it.template_code,
+        templateName: it.template_name,
+        status: toTitle(it.status) as TemplateFrontend["status"],
         createdAt: (it.created_at ?? "").slice(0, 10),
         updatedAt: (it.updated_at ?? "").slice(0, 10),
-        dbName: it.db_name ?? undefined,
-        template: it.template
-          ? {
-              id: String(it.template.id),
-              template_code: it.template.template_code,
-              template_name: it.template.template_name,
-            }
-          : null,
       }));
-      setProducts(mapped);
+      setTemplateFrontend(mapped);
 
-      if (meta?.trashed != null) {
-        setTrashCount(Number(meta.trashed) || 0);
+      // update badge sampah (pakai meta jika disediakan controller)
+      if (json?.meta?.trashed != null) {
+        setTrashCount(Number(json.meta.trashed) || 0);
       } else {
+        // fallback hitung langsung dari endpoint trash=only
         const c = await countTrash();
         setTrashCount(c);
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.message || "Gagal memuat products");
+      toast.error(e?.message || "Gagal memuat template frontend");
     }
   }
 
   useEffect(() => {
     reload();
-    // load opsi template
-    fetchTemplateOptions()
-      .then(setTemplateOptions)
-      .catch((e) => console.error(e));
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const q = searchTerm.toLowerCase();
+  const filteredTemplateFrontend = useMemo(() => {
+    return templateFrontend.filter((tf) => {
       const matchesSearch =
-        product.productName.toLowerCase().includes(q) ||
-        product.productCode.toLowerCase().includes(q);
+        tf.templateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tf.templateCode.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus =
         statusFilter === "all" ||
-        product.status === (statusFilter as FeatureStatus);
+        tf.status === (statusFilter as TemplateFrontend["status"]);
       return matchesSearch && matchesStatus;
     });
-  }, [products, searchTerm, statusFilter]);
+  }, [templateFrontend, searchTerm, statusFilter]);
 
-  async function handleCreateProduct() {
+  async function handleCreateTemplateFrontend() {
     try {
-      if (!formData.productCode || !formData.productName) {
+      if (!formData.templateCode || !formData.templateName) {
         toast.error("Semua field harus diisi");
         return;
       }
-      if (formData.dbName && !isValidDbName(formData.dbName)) {
-        toast.error("DB Name hanya boleh huruf/angka/underscore (maks 60)");
-        return;
-      }
-      const exists = products.find(
+
+      const exists = templateFrontend.find(
         (p) =>
-          p.productCode.toUpperCase() === formData.productCode.toUpperCase()
+          p.templateCode.toUpperCase() === formData.templateCode.toUpperCase()
       );
       if (exists) {
-        toast.error("Product Code sudah digunakan");
+        toast.error("Template Code sudah digunakan");
         return;
       }
 
-      const payload: any = {
-        product_code: formData.productCode.toUpperCase(),
-        product_name: formData.productName,
+      const payload = {
+        template_code: formData.templateCode.toUpperCase(),
+        template_name: formData.templateName,
         status: toLower(formData.status),
       };
-      if (formData.dbName) payload.db_name = formData.dbName;
-      if (formData.templateId) payload.template_id = formData.templateId;
 
-      await createProduct(payload);
-      toast.success("Product berhasil ditambahkan");
+      await createData("template-frontend", payload);
+      toast.success("Template frontend berhasil ditambahkan");
       setIsCreateDialogOpen(false);
-      setFormData({
-        productCode: "",
-        productName: "",
-        status: "Active",
-        dbName: "",
-        templateId: "",
-      });
+      setFormData({ templateCode: "", templateName: "", status: "Active" });
       await reload();
     } catch (e: any) {
-      toast.error(e?.message || "Gagal menambah product");
+      toast.error(e?.message || "Gagal menambah template frontend");
     }
   }
 
-  async function handleEditProduct() {
+  async function handleEditTemplateFrontend() {
     try {
-      if (!editingProduct || !formData.productCode || !formData.productName) {
+      if (
+        !editingTemplateFrontend ||
+        !formData.templateCode ||
+        !formData.templateName
+      ) {
         toast.error("Semua field harus diisi");
         return;
       }
-      if (formData.dbName && !isValidDbName(formData.dbName)) {
-        toast.error("DB Name hanya boleh huruf/angka/underscore (maks 60)");
-        return;
-      }
-      const exists = products.find(
+
+      const exists = templateFrontend.find(
         (p) =>
-          p.productCode.toUpperCase() === formData.productCode.toUpperCase() &&
-          p.id !== editingProduct.id
+          p.templateCode.toUpperCase() ===
+            formData.templateCode.toUpperCase() &&
+          p.id !== editingTemplateFrontend.id
       );
       if (exists) {
         toast.error("Product Code sudah digunakan");
         return;
       }
 
-      const payload: any = {
-        product_code: formData.productCode.toUpperCase(),
-        product_name: formData.productName,
+      const payload = {
+        template_code: formData.templateCode.toUpperCase(),
+        template_name: formData.templateName,
         status: toLower(formData.status),
       };
-      // Kirim null bila user kosongkan template agar backend set null
-      payload.template_id = formData.templateId || null;
-      if (formData.dbName) payload.db_name = formData.dbName;
 
-      await updateProduct(editingProduct.id, payload);
-      toast.success("Product berhasil diperbarui");
+      await updateData(
+        "template-frontend",
+        editingTemplateFrontend.id,
+        payload
+      );
+      toast.success("Template frontend berhasil diperbarui");
       setIsEditDialogOpen(false);
-      setEditingProduct(null);
-      setFormData({
-        productCode: "",
-        productName: "",
-        status: "Active",
-        dbName: "",
-        templateId: "",
-      });
+      setEditingTemplateFrontend(null);
+      setFormData({ templateCode: "", templateName: "", status: "Active" });
       await reload();
     } catch (e: any) {
-      toast.error(e?.message || "Gagal memperbarui product");
+      toast.error(e?.message || "Gagal memperbarui Template frontend");
     }
   }
 
   // Buka dialog konfirmasi hapus
-  function confirmDelete(product: Product) {
-    setDeletingProduct(product);
+  function confirmDelete(tf: TemplateFrontend) {
+    setDeletingTemplateFrontend(tf);
     setIsConfirmOpen(true);
   }
 
   // Eksekusi hapus (soft delete)
-  async function doDeleteProduct() {
-    if (!deletingProduct) return;
+  async function doDeleteTemplateFrontend() {
+    if (!deletingTemplateFrontend) return;
     try {
-      await deleteProduct(deletingProduct.id);
-      toast.success("Product dipindahkan ke Sampah");
+      await deleteData("template-frontend", deletingTemplateFrontend.id); // backend = soft delete
+      toast.success("Template frontend dipindahkan ke Sampah");
       setIsConfirmOpen(false);
-      setDeletingProduct(null);
+      setDeletingTemplateFrontend(null);
       await reload();
     } catch (e: any) {
-      toast.error(e?.message || "Gagal menghapus product");
+      toast.error(e?.message || "Gagal menghapus Template frontend");
     }
   }
 
-  const openEditDialog = (product: Product) => {
-    setEditingProduct(product);
+  const openEditDialog = (tf: TemplateFrontend) => {
+    setEditingTemplateFrontend(tf);
     setFormData({
-      productCode: product.productCode,
-      productName: product.productName,
-      status: product.status,
-      dbName: product.dbName || "",
-      templateId: product.template?.id || "",
+      templateCode: tf.templateCode,
+      templateName: tf.templateName,
+      status: tf.status,
     });
     setIsEditDialogOpen(true);
   };
 
-  const getStatusBadge = (status: FeatureStatus) => {
+  const getStatusBadge = (status: TemplateFrontend["status"]) => {
     switch (status) {
       case "Active":
         return (
@@ -342,19 +285,31 @@ export function ProductDashboard() {
 
   const stats = useMemo(
     () => ({
-      total: products.length,
-      active: products.filter((p) => p.status === "Active").length,
-      inactive: products.filter((p) => p.status === "Inactive").length,
-      archived: products.filter((p) => p.status === "Archived").length,
+      total: templateFrontend.length,
+      active: templateFrontend.filter((p) => p.status === "Active").length,
+      inactive: templateFrontend.filter((p) => p.status === "Inactive").length,
+      archived: templateFrontend.filter((p) => p.status === "Archived").length,
     }),
-    [products]
+    [templateFrontend]
   );
 
   // ====== Trash (soft-deleted) handlers ======
   async function countTrash(): Promise<number> {
     try {
-      const { data } = await fetchProducts({ trash: "only" });
-      return data.length || 0;
+      const url = new URL(`${API_URL}/template-frontend`);
+      url.searchParams.set("trash", "only");
+      const res = await fetch(url.toString(), {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return 0;
+      const json = await res.json();
+      const arr: any[] = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json)
+        ? json
+        : [];
+      return arr.length;
     } catch {
       return 0;
     }
@@ -363,22 +318,26 @@ export function ProductDashboard() {
   async function loadTrash() {
     try {
       setLoadingTrash(true);
-      const { data } = await fetchProducts({ trash: "only" });
-      const mapped: Product[] = data.map((it: any) => ({
+      const url = new URL(`${API_URL}/template-frontend`);
+      url.searchParams.set("trash", "only");
+      const res = await fetch(url.toString(), {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      const arr: any[] = Array.isArray(json?.data)
+        ? json.data
+        : Array.isArray(json)
+        ? json
+        : [];
+      const mapped: TemplateFrontend[] = arr.map((it) => ({
         id: String(it.id),
-        productCode: it.product_code,
-        productName: it.product_name,
-        status: toTitle(it.status) as FeatureStatus,
+        templateCode: it.template_code,
+        templateName: it.template_name,
+        status: toTitle(it.status) as TemplateFrontend["status"],
         createdAt: (it.created_at ?? "").slice(0, 10),
         updatedAt: (it.updated_at ?? "").slice(0, 10),
-        dbName: it.db_name ?? undefined,
-        template: it.template
-          ? {
-              id: String(it.template.id),
-              template_code: it.template.template_code,
-              template_name: it.template.template_name,
-            }
-          : null,
       }));
       setTrashed(mapped);
       setTrashCount(mapped.length);
@@ -397,8 +356,11 @@ export function ProductDashboard() {
   async function restoreItem(id: string) {
     try {
       setProcessingId(id);
-      await restoreProduct(id);
-      toast.success("Produk dipulihkan");
+      const res = await fetch(`${API_URL}/template-frontend/${id}/restore`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success("Template frontend dipulihkan");
       await Promise.all([loadTrash(), reload()]);
     } catch (e: any) {
       toast.error(e?.message || "Gagal memulihkan");
@@ -410,8 +372,11 @@ export function ProductDashboard() {
   async function forceDeleteItem(id: string) {
     try {
       setProcessingId(id);
-      await forceDeleteProduct(id);
-      toast.success("Produk dihapus permanen");
+      const res = await fetch(`${API_URL}/template-frontend/${id}/force`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success("Template frontend dihapus permanen");
       await loadTrash();
     } catch (e: any) {
       toast.error(e?.message || "Gagal hapus permanen");
@@ -426,15 +391,16 @@ export function ProductDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Product Management
+            Template Frontend Management
           </h1>
           <p className="text-muted-foreground mt-2">
-            Kelola produk digital dan aplikasi yang tersedia dalam sistem
+            Kelola Template frontend yang tersedia dalam sistem
           </p>
         </div>
 
-        {/* Action buttons: Sampah + Add Product */}
+        {/* Action buttons on the right: Sampah + Add template */}
         <div className="flex items-center gap-2">
+          {/* Tombol Sampah (outline merah) + badge count */}
           <Dialog open={isTrashOpen} onOpenChange={setIsTrashOpen}>
             <DialogTrigger asChild>
               <Button
@@ -445,6 +411,7 @@ export function ProductDashboard() {
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Sampah
+                {/* badge bulat kecil di kanan teks */}
                 <span className="ml-2 inline-flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs px-2 py-0.5">
                   {trashCount}
                 </span>
@@ -452,9 +419,9 @@ export function ProductDashboard() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Sampah Product</DialogTitle>
+                <DialogTitle>Sampah Template Frontend</DialogTitle>
                 <DialogDescription>
-                  Kelola produk yang telah dihapus. Pulihkan atau hapus
+                  Kelola Template yang telah dihapus. Pulihkan atau hapus
                   permanen.
                 </DialogDescription>
               </DialogHeader>
@@ -469,7 +436,7 @@ export function ProductDashboard() {
                   <div className="text-center py-12">
                     <Trash2 className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
                     <div className="text-sm text-muted-foreground">
-                      Tidak ada product di sampah
+                      Tidak ada Template frontend di sampah
                     </div>
                   </div>
                 ) : (
@@ -477,8 +444,8 @@ export function ProductDashboard() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Product Code</TableHead>
-                          <TableHead>Product Name</TableHead>
+                          <TableHead>Template Code</TableHead>
+                          <TableHead>Template Name</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -486,9 +453,9 @@ export function ProductDashboard() {
                         {trashed.map((p) => (
                           <TableRow key={p.id}>
                             <TableCell className="font-mono">
-                              {p.productCode}
+                              {p.templateCode}
                             </TableCell>
-                            <TableCell>{p.productName}</TableCell>
+                            <TableCell>{p.templateName}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
@@ -531,7 +498,7 @@ export function ProductDashboard() {
             </DialogContent>
           </Dialog>
 
-          {/* Add Product */}
+          {/* Tombol Add Template (tetap) */}
           <Dialog
             open={isCreateDialogOpen}
             onOpenChange={setIsCreateDialogOpen}
@@ -539,96 +506,47 @@ export function ProductDashboard() {
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Product
+                Add Template
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Tambah Product Baru</DialogTitle>
+                <DialogTitle>Tambah Template Baru</DialogTitle>
                 <DialogDescription>
-                  Tambahkan produk digital baru ke dalam sistem
+                  Tambahkan Template frontend baru ke dalam sistem
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="productCode">Product Code</Label>
+                  <Label htmlFor="templateCode">template Code</Label>
                   <Input
-                    id="productCode"
-                    placeholder="RENTVIX"
-                    value={formData.productCode}
-                    onChange={(e) => {
-                      const code = e.target.value.toUpperCase();
-                      setFormData((prev) => {
-                        const suggested = toDbNameSuggestion(code);
-                        const keepCurrent =
-                          prev.dbName &&
-                          prev.dbName !== toDbNameSuggestion(prev.productCode);
-                        return {
-                          ...prev,
-                          productCode: code,
-                          dbName: keepCurrent ? prev.dbName : suggested,
-                        };
-                      });
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="productName">Product Name</Label>
-                  <Input
-                    id="productName"
-                    placeholder="RentVix Pro"
-                    value={formData.productName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, productName: e.target.value })
-                    }
-                  />
-                </div>
-
-                {/* DB NAME */}
-                <div>
-                  <Label htmlFor="dbName">DB Name</Label>
-                  <Input
-                    id="dbName"
-                    placeholder="rentvix_pro"
-                    value={formData.dbName}
+                    id="templateCode"
+                    placeholder="NATURAL"
+                    value={formData.templateCode}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        dbName: e.target.value
-                          .replace(/[^A-Za-z0-9_]/g, "_")
-                          .slice(0, 60),
+                        templateCode: e.target.value.toUpperCase(),
                       })
                     }
                   />
                 </div>
-
-                {/* TEMPLATE (baru) */}
                 <div>
-                  <Label htmlFor="templateId">Template</Label>
-                  <Select
-                    value={formData.templateId || ""}
-                    onValueChange={(value: string) =>
-                      setFormData({ ...formData, templateId: value })
+                  <Label htmlFor="templateName">Template Name</Label>
+                  <Input
+                    id="templateName"
+                    placeholder="Template Natural"
+                    value={formData.templateName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, templateName: e.target.value })
                     }
-                  >
-                    <SelectTrigger id="templateId">
-                      <SelectValue placeholder="Pilih template (opsional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {templateOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
-
                 <div>
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value: FeatureStatus) =>
+                    onValueChange={(value: TemplateFrontend["status"]) =>
                       setFormData({ ...formData, status: value })
                     }
                   >
@@ -650,7 +568,9 @@ export function ProductDashboard() {
                 >
                   Batal
                 </Button>
-                <Button onClick={handleCreateProduct}>Tambah Product</Button>
+                <Button onClick={handleCreateTemplateFrontend}>
+                  Tambah Template
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -662,21 +582,21 @@ export function ProductDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Total Products
+              Total Templates
             </CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground">
-              Semua produk dalam sistem
+              Semua template dalam sistem
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Active Products
+              Active Templates
             </CardTitle>
             <Activity className="h-4 w-4 text-green-600" />
           </CardHeader>
@@ -685,14 +605,14 @@ export function ProductDashboard() {
               {stats.active}
             </div>
             <p className="text-xs text-muted-foreground">
-              Produk yang sedang aktif
+              Template yang sedang aktif
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Inactive Products
+              Inactive Templates
             </CardTitle>
             <Users className="h-4 w-4 text-yellow-600" />
           </CardHeader>
@@ -701,14 +621,14 @@ export function ProductDashboard() {
               {stats.inactive}
             </div>
             <p className="text-xs text-muted-foreground">
-              Produk yang tidak aktif
+              Template yang tidak aktif
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Archived Products
+              Archived templates
             </CardTitle>
             <Archive className="h-4 w-4 text-gray-600" />
           </CardHeader>
@@ -717,7 +637,7 @@ export function ProductDashboard() {
               {stats.archived}
             </div>
             <p className="text-xs text-muted-foreground">
-              Produk yang diarsipkan
+              Template yang diarsipkan
             </p>
           </CardContent>
         </Card>
@@ -726,10 +646,8 @@ export function ProductDashboard() {
       {/* Filters and Search */}
       <Card>
         <CardHeader>
-          <CardTitle>Daftar Products</CardTitle>
-          <CardDescription>
-            Kelola semua produk digital dalam sistem
-          </CardDescription>
+          <CardTitle>Daftar Templates</CardTitle>
+          <CardDescription>Kelola semua template dalam sistem</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between gap-4 mb-6">
@@ -737,7 +655,7 @@ export function ProductDashboard() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Cari product..."
+                  placeholder="Cari template..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 w-64"
@@ -762,8 +680,8 @@ export function ProductDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Product Code</TableHead>
-                  <TableHead>Product Name</TableHead>
+                  <TableHead>Template Code</TableHead>
+                  <TableHead>Template Name</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
@@ -771,34 +689,35 @@ export function ProductDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
+                {filteredTemplateFrontend.map((tf) => (
+                  <TableRow key={tf.id}>
                     <TableCell className="font-mono font-medium">
-                      {product.productCode}
+                      {tf.templateCode}
                     </TableCell>
                     <TableCell className="font-medium">
-                      {product.productName}
+                      {tf.templateName}
                     </TableCell>
-                    <TableCell>{getStatusBadge(product.status)}</TableCell>
+                    <TableCell>{getStatusBadge(tf.status)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {product.createdAt}
+                      {tf.createdAt}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {product.updatedAt}
+                      {tf.updatedAt}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => openEditDialog(product)}
+                          onClick={() => openEditDialog(tf)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {/* ubah: buka dialog konfirmasi saat menghapus */}
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => confirmDelete(product)}
+                          onClick={() => confirmDelete(tf)}
                           className="text-red-600 hover:text-red-700"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -811,14 +730,14 @@ export function ProductDashboard() {
             </Table>
           </div>
 
-          {filteredProducts.length === 0 && (
+          {filteredTemplateFrontend.length === 0 && (
             <div className="text-center py-8">
               <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Tidak ada product ditemukan
+                Tidak ada template ditemukan
               </h3>
               <p className="text-gray-500">
-                Coba ubah filter atau tambah product baru
+                Coba ubah filter atau tambah template baru
               </p>
             </div>
           )}
@@ -829,88 +748,38 @@ export function ProductDashboard() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Product</DialogTitle>
-            <DialogDescription>Perbarui informasi produk</DialogDescription>
+            <DialogTitle>Edit Template Frontend</DialogTitle>
+            <DialogDescription>Perbarui informasi template</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="editProductCode">Product Code</Label>
+              <Label htmlFor="editTemplateCode">Template Code</Label>
               <Input
-                id="editProductCode"
-                value={formData.productCode}
-                onChange={(e) =>
-                  setFormData((prev) => {
-                    const code = e.target.value.toUpperCase();
-                    const suggestedBefore = toDbNameSuggestion(
-                      prev.productCode
-                    );
-                    const userChanged =
-                      prev.dbName && prev.dbName !== suggestedBefore;
-                    const suggestedNow = toDbNameSuggestion(code);
-                    return {
-                      ...prev,
-                      productCode: code,
-                      dbName: userChanged ? prev.dbName : suggestedNow,
-                    };
-                  })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="editProductName">Product Name</Label>
-              <Input
-                id="editProductName"
-                value={formData.productName}
-                onChange={(e) =>
-                  setFormData({ ...formData, productName: e.target.value })
-                }
-              />
-            </div>
-
-            {/* DB NAME */}
-            <div>
-              <Label htmlFor="editDbName">DB Name</Label>
-              <Input
-                id="editDbName"
-                value={formData.dbName}
+                id="editTemplateCode"
+                value={formData.templateCode}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    dbName: e.target.value
-                      .replace(/[^A-Za-z0-9_]/g, "_")
-                      .slice(0, 60),
+                    templateCode: e.target.value.toUpperCase(),
                   })
                 }
               />
             </div>
-
-            {/* TEMPLATE (baru) */}
             <div>
-              <Label htmlFor="editTemplateId">Template</Label>
-              <Select
-                value={formData.templateId || ""}
-                onValueChange={(value: string) =>
-                  setFormData({ ...formData, templateId: value })
+              <Label htmlFor="editTemplateName">Template Name</Label>
+              <Input
+                id="editTemplateName"
+                value={formData.templateName}
+                onChange={(e) =>
+                  setFormData({ ...formData, templateName: e.target.value })
                 }
-              >
-                <SelectTrigger id="editTemplateId">
-                  <SelectValue placeholder="Pilih template (opsional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {templateOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
-
             <div>
               <Label htmlFor="editStatus">Status</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value: FeatureStatus) =>
+                onValueChange={(value: TemplateFrontend["status"]) =>
                   setFormData({ ...formData, status: value })
                 }
               >
@@ -932,35 +801,39 @@ export function ProductDashboard() {
             >
               Batal
             </Button>
-            <Button onClick={handleEditProduct}>Update Product</Button>
+            <Button onClick={handleEditTemplateFrontend}>
+              Update Template
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Delete Dialog */}
+      {/* Confirm Delete Dialog (soft delete) */}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center">
               <Trash2 className="mr-2 h-5 w-5 text-red-600" />
-              Hapus Product?
+              Hapus Template Frontend?
             </DialogTitle>
             <DialogDescription>
-              Tindakan ini akan memindahkan product ke{" "}
+              Tindakan ini akan memindahkan template ke{" "}
               <span className="font-medium text-red-600">Sampah</span>. Anda
               masih bisa memulihkannya dari menu Sampah.
             </DialogDescription>
           </DialogHeader>
 
-          {deletingProduct && (
+          {deletingTemplateFrontend && (
             <div className="rounded-md border bg-muted/30 p-3 text-sm">
-              <div className="font-medium">{deletingProduct.productName}</div>
+              <div className="font-medium">
+                {deletingTemplateFrontend.templateName}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 font-mono">
-                  {deletingProduct.productCode}
+                  {deletingTemplateFrontend.templateCode}
                 </span>
                 <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                  {deletingProduct.status.toLowerCase()}
+                  {deletingTemplateFrontend.status.toLowerCase()}
                 </span>
               </div>
             </div>
@@ -972,7 +845,7 @@ export function ProductDashboard() {
             </Button>
             <Button
               className="bg-red-600 hover:bg-red-700"
-              onClick={doDeleteProduct}
+              onClick={doDeleteTemplateFrontend}
             >
               Hapus
             </Button>
