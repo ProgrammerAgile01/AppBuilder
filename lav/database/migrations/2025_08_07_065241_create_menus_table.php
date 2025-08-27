@@ -17,7 +17,8 @@ return new class extends Migration {
             $table->integer('order_number')->default(0);
             $table->foreignId('crud_builder_id')->nullable()->constrained('crud_builders')->onDelete('set null');
              $table->foreignId('product_id')->nullable()->constrained('mst_products')->onDelete('set null');
-            $table->string('route_path')->nullable();
+             $table->string('product_code', 64)->index()->nullable();
+             $table->string('route_path')->nullable();
             $table->boolean('is_active')->default(true);
             $table->text('note')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();

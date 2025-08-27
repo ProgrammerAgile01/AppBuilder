@@ -41,12 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 import {
   Settings,
@@ -867,9 +862,14 @@ export function AturFiturDashboard() {
             className="w-full"
           >
             <div className="mb-4">
-              <TabsList className="grid grid-cols-2 w-full max-w-xl">
-                <TabsTrigger value="struktur">Struktur Fitur</TabsTrigger>
-                <TabsTrigger value="preview">Preview Fitur</TabsTrigger>
+              {/* full width */}
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="struktur" className="w-full">
+                  Struktur Fitur
+                </TabsTrigger>
+                <TabsTrigger value="preview" className="w-full">
+                  Preview Fitur
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -942,7 +942,9 @@ export function AturFiturDashboard() {
                                 {parent.price_addon > 0 && (
                                   <p className="text-xs text-green-600">
                                     +Rp{" "}
-                                    {Number(parent.price_addon).toLocaleString()}
+                                    {Number(
+                                      parent.price_addon
+                                    ).toLocaleString()}
                                     /bulan
                                   </p>
                                 )}
@@ -980,10 +982,8 @@ export function AturFiturDashboard() {
                                         setParentForm({
                                           name: parent.name,
                                           code: parent.code,
-                                          description:
-                                            parent.description || "",
-                                          price_addon:
-                                            parent.price_addon || 0,
+                                          description: parent.description || "",
+                                          price_addon: parent.price_addon || 0,
                                           trial_available:
                                             !!parent.trial_available,
                                           trial_days: parent.trial_days || 0,
@@ -1082,9 +1082,7 @@ export function AturFiturDashboard() {
                               <div className="flex items-start gap-2">
                                 <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab mt-1" />
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium">
-                                    {child.name}
-                                  </h4>
+                                  <h4 className="font-medium">{child.name}</h4>
                                   <p className="text-xs text-muted-foreground font-mono bg-muted px-2 py-1 rounded mt-1 inline-block">
                                     {child.feature_code}
                                   </p>
@@ -1599,140 +1597,153 @@ export function AturFiturDashboard() {
           <DialogHeader>
             <DialogTitle>Tambah Fitur Child</DialogTitle>
           </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label>Product</Label>
-            <Input value={selectedProduct?.name || ""} disabled className="bg-muted" />
-          </div>
+          <div className="space-y-4">
+            <div>
+              <Label>Product</Label>
+              <Input
+                value={selectedProduct?.name || ""}
+                disabled
+                className="bg-muted"
+              />
+            </div>
 
-          <div>
-            <Label>Fitur Parent</Label>
-            <Input
-              value={
-                selectedParent ? `${selectedParent.name} (${selectedParent.code})` : ""
-              }
-              disabled
-              className="bg-muted"
-            />
-          </div>
+            <div>
+              <Label>Fitur Parent</Label>
+              <Input
+                value={
+                  selectedParent
+                    ? `${selectedParent.name} (${selectedParent.code})`
+                    : ""
+                }
+                disabled
+                className="bg-muted"
+              />
+            </div>
 
-          <div>
-            <Label htmlFor="feature_code">Kode Fitur *</Label>
-            <Input
-              id="feature_code"
-              value={childForm.feature_code}
-              onChange={(e) => {
-                setChildForm((prev) => ({
-                  ...prev,
-                  feature_code: e.target.value,
-                }));
-                if (childFormErrors.feature_code)
-                  setChildFormErrors((prev) => ({
+            <div>
+              <Label htmlFor="feature_code">Kode Fitur *</Label>
+              <Input
+                id="feature_code"
+                value={childForm.feature_code}
+                onChange={(e) => {
+                  setChildForm((prev) => ({
                     ...prev,
-                    feature_code: "",
+                    feature_code: e.target.value,
                   }));
-              }}
-              className={`font-mono ${childFormErrors.feature_code ? "border-red-500" : ""}`}
-              placeholder="wa.send_booking"
-            />
-            {childFormErrors.feature_code && (
-              <p className="text-sm text-red-500 mt-1">
-                {childFormErrors.feature_code}
-              </p>
-            )}
-          </div>
+                  if (childFormErrors.feature_code)
+                    setChildFormErrors((prev) => ({
+                      ...prev,
+                      feature_code: "",
+                    }));
+                }}
+                className={`font-mono ${
+                  childFormErrors.feature_code ? "border-red-500" : ""
+                }`}
+                placeholder="wa.send_booking"
+              />
+              {childFormErrors.feature_code && (
+                <p className="text-sm text-red-500 mt-1">
+                  {childFormErrors.feature_code}
+                </p>
+              )}
+            </div>
 
-          <div>
-            <Label htmlFor="child-name">Nama Child *</Label>
-            <Input
-              id="child-name"
-              value={childForm.name}
-              onChange={(e) => {
-                setChildForm((prev) => ({ ...prev, name: e.target.value }));
-                if (childFormErrors.name)
-                  setChildFormErrors((prev) => ({ ...prev, name: "" }));
-              }}
-              className={childFormErrors.name ? "border-red-500" : ""}
-            />
-            {childFormErrors.name && (
-              <p className="text-sm text-red-500 mt-1">
-                {childFormErrors.name}
-              </p>
-            )}
-          </div>
+            <div>
+              <Label htmlFor="child-name">Nama Child *</Label>
+              <Input
+                id="child-name"
+                value={childForm.name}
+                onChange={(e) => {
+                  setChildForm((prev) => ({ ...prev, name: e.target.value }));
+                  if (childFormErrors.name)
+                    setChildFormErrors((prev) => ({ ...prev, name: "" }));
+                }}
+                className={childFormErrors.name ? "border-red-500" : ""}
+              />
+              {childFormErrors.name && (
+                <p className="text-sm text-red-500 mt-1">
+                  {childFormErrors.name}
+                </p>
+              )}
+            </div>
 
-          <div>
-            <Label>Pilih Menu *</Label>
-            <Select
-              value={childForm.crud_menu_id}
-              onValueChange={(value) => {
-                setChildForm((prev) => ({ ...prev, crud_menu_id: value }));
-                if (childFormErrors.crud_menu_id)
-                  setChildFormErrors((prev) => ({
-                    ...prev,
-                    crud_menu_id: "",
-                  }));
-              }}
-            >
-              <SelectTrigger
-                className={childFormErrors.crud_menu_id ? "border-red-500" : ""}
+            <div>
+              <Label>Pilih Menu *</Label>
+              <Select
+                value={childForm.crud_menu_id}
+                onValueChange={(value) => {
+                  setChildForm((prev) => ({ ...prev, crud_menu_id: value }));
+                  if (childFormErrors.crud_menu_id)
+                    setChildFormErrors((prev) => ({
+                      ...prev,
+                      crud_menu_id: "",
+                    }));
+                }}
               >
-                <SelectValue placeholder="Pilih menu dari CRUD Builder" />
-              </SelectTrigger>
-              <SelectContent>
-                {crudMenus.map((menu) => (
-                  <SelectItem key={menu.id} value={menu.id}>
-                    {menu.path}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {childFormErrors.crud_menu_id && (
-              <p className="text-sm text-red-500 mt-1">
-                {childFormErrors.crud_menu_id}
-              </p>
-            )}
-          </div>
+                <SelectTrigger
+                  className={
+                    childFormErrors.crud_menu_id ? "border-red-500" : ""
+                  }
+                >
+                  <SelectValue placeholder="Pilih menu dari CRUD Builder" />
+                </SelectTrigger>
+                <SelectContent>
+                  {crudMenus.map((menu) => (
+                    <SelectItem key={menu.id} value={menu.id}>
+                      {menu.path}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {childFormErrors.crud_menu_id && (
+                <p className="text-sm text-red-500 mt-1">
+                  {childFormErrors.crud_menu_id}
+                </p>
+              )}
+            </div>
 
-          <div>
-            <Label htmlFor="child-description">Deskripsi</Label>
-            <Textarea
-              id="child-description"
-              value={childForm.description}
-              onChange={(e) =>
-                setChildForm((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              rows={3}
-            />
-          </div>
+            <div>
+              <Label htmlFor="child-description">Deskripsi</Label>
+              <Textarea
+                id="child-description"
+                value={childForm.description}
+                onChange={(e) =>
+                  setChildForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                rows={3}
+              />
+            </div>
 
-          <div>
-            <Label>Status</Label>
-            <Select
-              value={childForm.status}
-              onValueChange={(value: "active" | "hidden") =>
-                setChildForm((prev) => ({ ...prev, status: value }))
-              }
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={childForm.status}
+                onValueChange={(value: "active" | "hidden") =>
+                  setChildForm((prev) => ({ ...prev, status: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="hidden">Hidden</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateChildOpen(false)}
             >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="hidden">Hidden</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsCreateChildOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleCreateChild}>Simpan</Button>
-        </DialogFooter>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateChild}>Simpan</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
