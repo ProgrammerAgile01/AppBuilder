@@ -420,12 +420,13 @@ export async function fetchProduct(): Promise<Product[]> {
    ========================= */
 export async function fetchMenus(opts?: {
   trash?: "none" | "with" | "only";
-  product_id?: string;
+  product_id?: string | number;
 }) {
   const url = new URL(`${API_URL}/menus`);
   url.searchParams.set("trash", opts?.trash ?? "none");
-  if (opts?.product_id)
+  if (opts?.product_id != null) {
     url.searchParams.set("product_id", String(opts.product_id));
+  }
 
   const res = await fetch(url.toString(), {
     cache: "no-store",
@@ -440,24 +441,51 @@ export async function fetchMenus(opts?: {
   return extractArray(json) as BackendMenu[];
 }
 
-export async function fetchMenusTreeWithTrashed(product_id?: string) {
+export async function fetchMenusTreeWithTrashed(product_id?: string | number) {
   return fetchMenus({ trash: "with", product_id });
 }
 
-export async function fetchMenusOnlyTrashed(product_id?: string) {
+export async function fetchMenusOnlyTrashed(product_id?: string | number) {
   return fetchMenus({ trash: "only", product_id });
 }
 
 /* =========================
    MENUS: helpers
    ========================= */
-// Alias agar pemakaian di komponen tetap bersih
+
+// Normalisasi payload sebelum kirim ke backend
+function normalizeMenuPayload(data: any) {
+  const payload: any = { ...data };
+
+  const toNumOrUndef = (v: any) => {
+    if (v === undefined || v === null || v === "") return undefined;
+    if (typeof v === "number") return v;
+    if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
+    return v; // biarkan string non-numeric (mis. uuid)
+  };
+
+  if ("parent_id" in payload) {
+    payload.parent_id = toNumOrUndef(payload.parent_id);
+  }
+  if ("crud_builder_id" in payload) {
+    payload.crud_builder_id = toNumOrUndef(payload.crud_builder_id);
+  }
+  if ("url" in payload && typeof payload.url === "string") {
+    payload.url = payload.url.trim();
+    if (payload.url === "") payload.url = undefined;
+  }
+
+  return payload;
+}
+
 export async function createMenu(data: any) {
-  return createData("menus", data);
+  const payload = normalizeMenuPayload(data);
+  return createData("menus", payload);
 }
 
 export async function updateMenu(id: string, data: any) {
-  return updateData("menus", id, data);
+  const payload = normalizeMenuPayload(data);
+  return updateData("menus", id, payload);
 }
 
 export async function deleteMenu(id: string) {
@@ -465,38 +493,66 @@ export async function deleteMenu(id: string) {
 }
 
 export async function restoreMenu(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/menus/${id}/restore`, { method: "POST" });
+  const res = await fetch(`${API_URL}/menus/${id}/restore`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) {
-    try {
-      const j = await res.json();
-      throw new Error(j?.message || "Gagal memulihkan item");
-    } catch {
-      throw new Error(await res.text());
-    }
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal memulihkan item");
   }
 }
 
 export async function forceDeleteMenu(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/menus/${id}/force`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
+  const res = await fetch(`${API_URL}/menus/${id}/force`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal menghapus permanen");
+  }
 }
 
 export async function reorderMenus(payload: {
   items: { id: string | number; order_number: number }[];
   parent_id?: string | number | null;
 }) {
+  const body = {
+    items: payload.items.map((it) => ({
+      id: String(it.id),
+      order_number: Number(it.order_number),
+    })),
+    parent_id:
+      payload.parent_id === null || payload.parent_id === undefined
+        ? null
+        : String(payload.parent_id),
+  };
+
   const res = await fetch(`${API_URL}/menus/reorder`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal menyusun ulang urutan");
+  }
   return res.json().catch(() => ({}));
 }
 
 export async function toggleMenuActive(id: string) {
-  const res = await fetch(`${API_URL}/menus/${id}/toggle`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
+  const res = await fetch(`${API_URL}/menus/${id}/toggle`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal mengubah status aktif");
+  }
   return res.json().catch(() => ({}));
 }
 
@@ -542,17 +598,22 @@ export async function fetchCrudBuilders(
    Generator Sidebar
    ========================= */
 export async function generateFrontendMenu(opts?: {
-  groupId?: string;
-  moduleId?: string;
-  productId?: string; // <-- TAMBAH INI
+  groupId?: string | number;
+  moduleId?: string | number;
+  productId?: string | number;
 }) {
   const url = new URL(`${API_URL}/generate-menu`);
-  if (opts?.groupId) url.searchParams.set("group_id", String(opts.groupId));
-  if (opts?.moduleId) url.searchParams.set("module_id", String(opts.moduleId));
-  if (opts?.productId)
-    url.searchParams.set("product_id", String(opts.productId)); // <-- TAMBAH INI
+  if (opts?.groupId != null)
+    url.searchParams.set("group_id", String(opts.groupId));
+  if (opts?.moduleId != null)
+    url.searchParams.set("module_id", String(opts.moduleId));
+  if (opts?.productId != null)
+    url.searchParams.set("product_id", String(opts.productId));
 
-  const res = await fetch(url.toString(), { method: "POST" });
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(txt || "Gagal generate sidebar");

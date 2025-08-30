@@ -13,5 +13,8 @@ Route::apiResource('vehicles', App\Http\Controllers\Generate\VehiclesController:
 Route::apiResource('access_control_matrices', App\Http\Controllers\Generate\AccessControlMatrixController::class);
 
 
+
+
+
 Route::get('fitur/tree', [\App\Http\Controllers\Generate\FeatureBuilderController::class, 'index']);
 Route::apiResource('fitur', \App\Http\Controllers\Generate\FeatureBuilderController::class);

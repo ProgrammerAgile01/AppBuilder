@@ -57,6 +57,7 @@ import {
   ArrowLeft,
   BarChart3,
   GripVertical,
+  CheckCircle2, // icon untuk dialog sukses
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -135,16 +136,14 @@ interface Product {
 // Helpers mapping
 // ======================
 
+// FIX: price_addon sekarang membaca dari response API
 const toUIParent = (n: FeatureTreeNode): FeatureParent => ({
   id: String(n.id),
   product_id: String(n.product_id ?? ""),
   name: n.name,
   code: n.feature_code ?? n.code ?? "",
   description: n.description ?? "",
-  price_addon:
-    typeof n.order_number === "number" || typeof n.order_number === "string"
-      ? 0
-      : 0, // (tidak tersedia di API read tree umum; tetap dipertahankan supaya UI tidak berubah)
+  price_addon: Number((n as any).price_addon ?? (n as any).price ?? 0),
   trial_available: !!(n as any).trial_available,
   trial_days:
     (n as any).trial_days == null
@@ -264,6 +263,10 @@ export function AturFiturDashboard() {
     totals: { all: 0, feature: 0, subfeature: 0, category: 0 },
   });
   const [trashTab, setTrashTab] = useState<"root" | "child" | "all">("root");
+
+  // Dialog sukses generate
+  const [genSuccessOpen, setGenSuccessOpen] = useState(false);
+  const [genSuccessMsg, setGenSuccessMsg] = useState<string>("");
 
   // Form states
   const [parentForm, setParentForm] = useState({
@@ -662,6 +665,11 @@ export function AturFiturDashboard() {
     try {
       toast.loading("Memproses generate fitur...", { id: "gen" });
       const res = await generateFiturForProduct(selectedProduct.id);
+
+      // Pastikan dialog sukses muncul
+      setGenSuccessMsg(res?.message || "Generate berhasil.");
+      setGenSuccessOpen(true);
+
       toast.success(res?.message || "Generate berhasil.", { id: "gen" });
       // reload list
       await handleProductChange(selectedProduct);
@@ -2265,6 +2273,36 @@ export function AturFiturDashboard() {
             <Button variant="outline" onClick={() => setTrashOpen(false)}>
               Tutup
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ======= Dialog Generate Sukses ======= */}
+      <Dialog open={genSuccessOpen} onOpenChange={setGenSuccessOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Generate Fitur Berhasil
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-gray-700">
+              {genSuccessMsg || "Proses generate fitur selesai."}
+            </p>
+            {selectedProduct && (
+              <div className="p-3 rounded-md bg-green-50 border border-green-200">
+                <div className="text-xs text-green-700">
+                  Produk:{" "}
+                  <span className="font-medium">{selectedProduct.name}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setGenSuccessOpen(false)}>OK</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

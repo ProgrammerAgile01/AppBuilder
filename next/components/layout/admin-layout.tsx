@@ -41,6 +41,7 @@ import {
   ChevronRight,
   Navigation,
   Palette,
+  Package,
 } from "lucide-react";
 
 const navigation = [
@@ -61,7 +62,7 @@ const navigation = [
   {
     name: "Product",
     href: "/admin/product",
-    icon: Palette,
+    icon: Package,
     description: "Product System",
     badge: "New",
   },
