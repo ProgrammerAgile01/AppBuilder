@@ -26,9 +26,7 @@
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="font-{{VALUE_WEIGHT}} text-{{VALUE_SIZE}} {{VALUE_COLOR}}">
-                {{VALUE_PREFIX}} {formatRupiah(filtered{{ENTITY_PASCAL_SINGULAR}}.{{VALUE}})}{{VALUE_SUFFIX}}
-              </span>
+              {{VALUE_CONTENT}}
               <div className="flex gap-1">
                 <Button
                   variant="outline"

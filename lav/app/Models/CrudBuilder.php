@@ -13,7 +13,7 @@ class CrudBuilder extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        // 'modules_id',
+        'product_id',
         'kategori_crud',
         'judul',
         'judul_en',
@@ -70,5 +70,11 @@ class CrudBuilder extends Model
     public function cardLayout() 
     {
         return $this->hasOne(CardLayout::class, 'crud_builder_id')->where('is_default', true);
+    }
+
+    // relasi belongs ke product
+    public function product() 
+    {
+        return $this->belongsTo(Product::class);
     }
 }

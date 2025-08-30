@@ -32,16 +32,15 @@ import { translateText } from "./crud-builder-page";
 import { toast } from "@/hooks/use-toast";
 import type { DataMaster } from "./crud-builder-page";
 import * as LucideIcons from "lucide-react";
-import { fetchOptions } from "@/lib/api";
+import { fetchProductsOnBuilder } from "@/lib/api";
 
 interface DataMasterSectionProps {
   dataMaster: DataMaster;
   setDataMaster: (data: DataMaster) => void;
 }
-type ModuleGroup = {
+type Product = {
   value: string;
   label: string;
-  icon: string;
 };
 
 const iconMap: Record<string, any> = {
@@ -90,13 +89,13 @@ export function DataMasterSection({
   const [isTranslating, setIsTranslating] = useState<Record<string, boolean>>(
     {}
   );
-  const [moduleGroups, setModuleGroups] = useState<
-    Array<{ value: number; label: string }>
+  const [products, setProducts] = useState<
+    Array<{ value: string; label: string }>
   >([]);
 
   useEffect(() => {
-    fetchOptions("modules")
-      .then(setModuleGroups)
+    fetchProductsOnBuilder("products", { status: "active" })
+      .then(setProducts)
       .catch(() => {
         toast({
           title: "Failed to load Module Groups",
@@ -285,6 +284,39 @@ export function DataMasterSection({
               })}
             </RadioGroup>
           </div>
+
+          {/* PRODUCT */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <Label
+                htmlFor="product"
+                className="text-sm font-medium text-slate-700"
+              >
+                Product <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={dataMaster.product ?? ""}
+                onValueChange={(value) => handleChange("product", value)}
+              >
+                <SelectTrigger className="h-11 border-slate-200 focus:ring-2 focus:ring-blue-500">
+                  <SelectValue placeholder="Select product..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => {
+                    return (
+                      <SelectItem key={product.value} value={product.value}>
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          {product.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Title Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="space-y-3">
@@ -421,36 +453,6 @@ export function DataMasterSection({
                 Auto-generated from title, but you can customize it
               </p>
             </div>
-
-            {/* <div className="space-y-3">
-              <Label
-                htmlFor="moduleGroup"
-                className="text-sm font-medium text-slate-700"
-              >
-                Module Group
-              </Label>
-              <Select
-                value={dataMaster.moduleGroup}
-                onValueChange={(value) => handleChange("moduleGroup", value)}
-              >
-                <SelectTrigger className="h-11 border-slate-200 focus:ring-2 focus:ring-blue-500">
-                  <SelectValue placeholder="Select module group..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {moduleGroups.map((group) => {
-                    const Icon = iconMap[group.icon] ?? Database;
-                    return (
-                      <SelectItem key={group.value} value={group.value}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {group.label}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div> */}
           </div>
 
           {/* Menu Icon */}

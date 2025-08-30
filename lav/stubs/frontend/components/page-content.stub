@@ -1,6 +1,7 @@
 "use client";
 
-import { Car, Circle, Edit, Eye, Fuel, MapPin, Plus, Trash2, Users } from "lucide-react";
+import { useState } from "react";
+import { Car, Circle, Edit, Eye, Fuel, MapPin, Plus, Trash2, Users, Download, Sparkles, Upload, FileSpreadsheet, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -18,10 +19,19 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 // import { type Vehicle } from "@/lib/vehicle-data";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { downloadExcel, downloadPdf } from "@/lib/api";
 
 const formatRupiah = (v: number | string) =>
   new Intl.NumberFormat("id-ID", { minimumFractionDigits: 0 }).format(
@@ -29,18 +39,144 @@ const formatRupiah = (v: number | string) =>
   );
 
 // Header
-export function {{ENTITY_PASCAL_SINGULAR}}Header({ onAdd }: { onAdd: () => void }) {
+export function {{ENTITY_PASCAL_SINGULAR}}Header({
+  onAdd,
+  search,
+  status,
+}: {
+  onAdd: () => void;
+  search?: string;
+  status?: string;
+}) {
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      await downloadExcel("{{ENTITY_PLURAL}}", {
+        // metadata header + tanda tangan di file Excel:
+          city: "Boyolali",
+          approved_by_name: "Manager Operasional",
+          approved_by_title: "Manager Operasional",
+          // approved_date: "21/08/2025", // kalau ingin set manual
+
+          // set true kalau backend pakai session/cookie auth
+          withCredentials: false,
+      },
+      "{{ENTITY_SNAKE_SINGULAR}}_export.xlsx"
+    );
+    } catch (e: any) {
+      alert(e?.message || "Gagal export Excel");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExporting(true);
+      await downloadPdf("{{ENTITY_PLURAL}}", {
+        approver_name: "Budi Santoso",
+        approver_title: "Kepala Operasional",
+        place: "Boyolali",  
+        // columns: "plate_number,brand,year,status", // kalau mau custom kolom
+        // limit: 200,
+        withCredentials: false,
+      }, "{{ENTITY_SNAKE_SINGULAR}}_report.pdf");
+    } catch (e: any) {
+      alert(e?.message || "Gagal export PDF");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  // next feature
+  const handleImportExcel = () => alert("TODO: Import CSV/Excel");
+
   return (
-    <div className="sticky top-16 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-4 px-4 pt-4">
+    <div className="sticky top-16 z-10 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-4 px-4 pt-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{{TITLE}}</h1>
           <p className="text-muted-foreground">{{DESKRIPSI}}</p>
         </div>
-        <Button onClick={onAdd} className="shrink-0">
-          <Plus className="h-4 w-4 mr-2" />
-          Tambah {{ENTITY_HEADLINE_SINGULAR}}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="shrink-0 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 border-purple-200 text-purple-700 font-medium shadow-sm hover:shadow-md transition-all duration-200"
+                disabled={isExporting || isImporting}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isExporting || isImporting ? "Processing..." : "Export/Import"}{" "}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-64 p-2 bg-white/95 backdrop-blur-sm border-purple-100 shadow-xl"
+            >
+              <DropdownMenuItem
+                onClick={handleExportPDF}
+                disabled={isExporting || isImporting}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-pink-600 text-white">
+                  <Sparkles className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    Modern PDF Report
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Beautiful design with gradients & styling
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportExcel}
+                disabled={isExporting || isImporting}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50 transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    Export ke CSV/Excel
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Data terstruktur untuk analisis
+                  </div>
+                </div>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-2 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+              <DropdownMenuItem
+                onClick={handleImportExcel}
+                disabled={isExporting || isImporting}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-50 transition-all duration-200 cursor-pointer"
+              >
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-orange-500 to-amber-600 text-white">
+                  <Upload className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    Import dari CSV
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Upload data {{ENTITY_HEADLINE_SINGULAR}} bulk
+                  </div>
+                </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button onClick={onAdd} className="shrink-0">
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah {{ENTITY_HEADLINE_SINGULAR}}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -159,7 +295,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Table({
   return isMobile ? (
     <div>
       {filtered{{ENTITY_PASCAL_SINGULAR}}.map((item: any) => (
-        <MobileVehicleCard
+        <Mobile{{ENTITY_PASCAL_SINGULAR}}Card
           key={item.id}
           filtered{{ENTITY_PASCAL_SINGULAR}}={item}
           handleDelete={handleDelete}
