@@ -29,7 +29,7 @@ function GroupHeader({ name, color }: { name: string; color?: string }) {
 
 /* ====== Sumber data menu (JANGAN DIUBAH) – generator isi di sini ====== */
 const menuItems: any =
-[{ id: "aas", icon: Package, labelKey: "Aas" as any, description: "sass", descriptionId: "sass", count: 1, items: [{ icon: Compass, labelKey: "Data Kendaraan" as any, href: "/admin/" }], groupId: "1", groupName: "asd", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" }];
+[{ id: "aas", icon: Package, labelKey: "Aas" as any, description: "sass", descriptionId: "sass", count: 1, items: [{ icon: Compass, labelKey: "Data Kendaraan" as any, href: "/admin/" }], groupId: "1", groupName: "asd", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" },{ id: "pegawai", icon: Users, labelKey: "Pegawai" as any, description: "-", descriptionId: "-", count: 1, items: [{ icon: Users, labelKey: "Data Pegawai" as any, href: "/admin/" }], groupId: "4", groupName: "Master Data", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" }];
 /*======================================================================*/
 
 /** 👉 Export agar dipakai juga oleh drawer mobile */

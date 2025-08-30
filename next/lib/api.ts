@@ -374,6 +374,23 @@ export async function forceDelete(entity: string, id: string) {
   return res.json();
 }
 
+/* ========== Trash box & restore/force ========== */
+
+export interface TrashBoxResponse {
+  success: boolean;
+  totals: {
+    all: number;
+    category: number;
+    feature: number;
+    subfeature: number;
+  };
+  items: {
+    category: FeatureTreeNode[];
+    feature: FeatureTreeNode[];
+    subfeature: FeatureTreeNode[];
+  };
+}
+
 export async function fetchTrashBoxFeatures(params?: {
   product_id?: string | number;
 }): Promise<TrashBoxResponse> {
@@ -409,6 +426,17 @@ export async function generateFiturForProduct(
   if (!res.ok) throw new Error(await res.text());
   return (await res.json().catch(() => ({}))) as any;
 }
+
+// =======Menus=====
+
+function extractArray(json: any): any[] {
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) return json.data;
+  if (Array.isArray(json?.data?.data)) return json.data.data;
+  if (Array.isArray(json?.rows)) return json.rows;
+  return [];
+}
+
 
 /* =========================
    PRODUCTS (dropdown)
@@ -458,9 +486,15 @@ export async function fetchProduct(): Promise<Product[]> {
   return rows.map(mapProduct);
 }
 
-export async function fetchMenus(opts?: { trash?: "none" | "with" | "only" }) {
+export async function fetchMenus(opts?: {
+  trash?: "none" | "with" | "only";
+  product_id?: string | number;
+}) {
   const url = new URL(`${API_URL}/menus`);
-  if (opts?.trash) url.searchParams.set("trash", opts.trash);
+  url.searchParams.set("trash", opts?.trash ?? "none");
+  if (opts?.product_id != null) {
+    url.searchParams.set("product_id", String(opts.product_id));
+  }
 
   const res = await fetch(url.toString(), {
     cache: "no-store",
@@ -475,102 +509,131 @@ export async function fetchMenus(opts?: { trash?: "none" | "with" | "only" }) {
   return extractArray(json) as BackendMenu[];
 }
 
-// Opsional: alias biar pemakaian jelas di MenuManagement
-export async function fetchMenusTreeWithTrashed() {
-  return fetchMenus({ trash: "with" }); // tree root + children (include trashed di relasi)
+export async function fetchMenusTreeWithTrashed(product_id?: string | number) {
+  return fetchMenus({ trash: "with", product_id });
 }
 
-export async function fetchMenusOnlyTrashed() {
-  return fetchMenus({ trash: "only" }); // flat list semua yang trashed
-}
-export async function createMenu(data: Partial<MenuItem>) {
-  return createData("menus", data);
+export async function fetchMenusOnlyTrashed(product_id?: string | number) {
+  return fetchMenus({ trash: "only", product_id });
 }
 
-export async function updateMenu(id: string, data: Partial<MenuItem>) {
-  return updateData("menus", id, data);
+/* =========================
+   MENUS: helpers
+   ========================= */
+
+// Normalisasi payload sebelum kirim ke backend
+function normalizeMenuPayload(data: any) {
+  const payload: any = { ...data };
+
+  const toNumOrUndef = (v: any) => {
+    if (v === undefined || v === null || v === "") return undefined;
+    if (typeof v === "number") return v;
+    if (typeof v === "string" && /^\d+$/.test(v)) return Number(v);
+    return v; // biarkan string non-numeric (mis. uuid)
+  };
+
+  if ("parent_id" in payload) {
+    payload.parent_id = toNumOrUndef(payload.parent_id);
+  }
+  if ("crud_builder_id" in payload) {
+    payload.crud_builder_id = toNumOrUndef(payload.crud_builder_id);
+  }
+  if ("url" in payload && typeof payload.url === "string") {
+    payload.url = payload.url.trim();
+    if (payload.url === "") payload.url = undefined;
+  }
+
+  return payload;
+}
+
+export async function createMenu(data: any) {
+  const payload = normalizeMenuPayload(data);
+  return createData("menus", payload);
+}
+
+export async function updateMenu(id: string, data: any) {
+  const payload = normalizeMenuPayload(data);
+  return updateData("menus", id, payload);
 }
 
 export async function deleteMenu(id: string) {
   return deleteData("menus", id);
 }
-// Perbaikan di api.ts
+
 export async function restoreMenu(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/menus/${id}/restore`, { method: "POST" });
+  const res = await fetch(`${API_URL}/menus/${id}/restore`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) {
-    let errorMessage = "Terjadi kesalahan saat memulihkan item.";
-    try {
-      // Coba ambil pesan dari respons JSON
-      const errorData = await res.json();
-      errorMessage = errorData.message || errorMessage;
-    } catch (e) {
-      // Jika respons bukan JSON, ambil teksnya
-      errorMessage = await res.text();
-    }
-    throw new Error(errorMessage);
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal memulihkan item");
   }
 }
 
 export async function forceDeleteMenu(id: string): Promise<void> {
-  const res = await fetch(`${API_URL}/menus/${id}/force`, { method: "DELETE" });
-  if (!res.ok) throw new Error(await res.text());
+  const res = await fetch(`${API_URL}/menus/${id}/force`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal menghapus permanen");
+  }
 }
 
-// export async function fetchCrudBuilders() {
-//   const res = await fetch(`${API_URL}/builder`, { cache: "no-store" });
-//   if (!res.ok) {
-//     throw new Error("Gagal mengambil daftar CRUD builders");
-//   }
-//   const json = await res.json();
-//   return json.data || [];
-// }
-// Helper: ubah 1 record builder ke CrudBuilderOption
-function normalizeBuilder(raw: any): CrudBuilderOption | null {
-  if (!raw) return null;
-
-  const id = raw.id ?? raw._id ?? raw.uuid;
-  if (id === undefined || id === null) return null;
-
-  const name = raw.name ?? raw.nama ?? raw.title ?? raw.judul ?? "";
-
-  const menu_title =
-    raw.menu_title ??
-    raw.menuTitle ??
-    raw.title ??
-    raw.judul ??
-    name ?? // fallback ke name
-    "";
-
-  const table_name =
-    raw.table_name ?? raw.tableName ?? raw.table ?? raw.slug ?? raw.route ?? "";
-
-  return {
-    id: String(id),
-    name: String(name || menu_title || table_name || "Untitled"),
-    menu_title: String(menu_title || name || "Untitled"),
-    table_name: String(table_name || "").replace(/^\//, ""), // buang leading slash kalau ada
+export async function reorderMenus(payload: {
+  items: { id: string | number; order_number: number }[];
+  parent_id?: string | number | null;
+}) {
+  const body = {
+    items: payload.items.map((it) => ({
+      id: String(it.id),
+      order_number: Number(it.order_number),
+    })),
+    parent_id:
+      payload.parent_id === null || payload.parent_id === undefined
+        ? null
+        : String(payload.parent_id),
   };
+
+  const res = await fetch(`${API_URL}/menus/reorder`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal menyusun ulang urutan");
+  }
+  return res.json().catch(() => ({}));
 }
 
-// Helper: ambil array `items` dari berbagai bentuk response
-function extractArray(json: any): any[] {
-  if (Array.isArray(json)) return json;
-  if (Array.isArray(json?.data)) return json.data; // { data: [...] }
-  if (Array.isArray(json?.data?.data)) return json.data.data; // { data: { data: [...] } } (paginate)
-  if (Array.isArray(json?.rows)) return json.rows; // { rows: [...] }
-  return [];
+export async function toggleMenuActive(id: string) {
+  const res = await fetch(`${API_URL}/menus/${id}/toggle`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(txt || "Gagal mengubah status aktif");
+  }
+  return res.json().catch(() => ({}));
 }
 
+/* =========================
+   CRUD BUILDERS (dropdown)
+   ========================= */
 export async function fetchCrudBuilders(
   signal?: AbortSignal
 ): Promise<CrudBuilderOption[]> {
   const res = await fetch(`${API_URL}/builder`, {
     cache: "no-store",
-    // credentials: "include", // kalau pakai auth cookie/JWT di cookie
     signal,
-    headers: {
-      Accept: "application/json",
-    },
+    headers: { Accept: "application/json" },
   });
 
   if (!res.ok) {
@@ -581,31 +644,44 @@ export async function fetchCrudBuilders(
   }
 
   const json = await res.json().catch(() => ({}));
-  const items = extractArray(json);
+  const rows = extractArray(json);
 
-  const mapped = items
-    .map(normalizeBuilder)
-    .filter((x): x is CrudBuilderOption => !!x);
+  const mapped: CrudBuilderOption[] = rows
+    .map((r: any) => ({
+      id: String(r.id),
+      name: String(r.name ?? r.menu_title ?? r.table_name ?? "Untitled"),
+      menu_title: String(r.judul_menu ?? r.name ?? "Untitled"),
+      table_name: String(r.table_name ?? "").replace(/^\//, ""),
+    }))
+    .filter((x) => x.id && x.menu_title);
 
-  // de-dupe by id + sort by menu_title
   const uniq = new Map<string, CrudBuilderOption>();
-  for (const m of mapped) {
-    if (!uniq.has(m.id)) uniq.set(m.id, m);
-  }
-
+  for (const m of mapped) if (!uniq.has(m.id)) uniq.set(m.id, m);
   return Array.from(uniq.values()).sort((a, b) =>
     a.menu_title.localeCompare(b.menu_title)
   );
 }
+
+/* =========================
+   Generator Sidebar
+   ========================= */
 export async function generateFrontendMenu(opts?: {
-  groupId?: string;
-  moduleId?: string;
+  groupId?: string | number;
+  moduleId?: string | number;
+  productId?: string | number;
 }) {
   const url = new URL(`${API_URL}/generate-menu`);
-  if (opts?.groupId) url.searchParams.set("group_id", String(opts.groupId));
-  if (opts?.moduleId) url.searchParams.set("module_id", String(opts.moduleId));
+  if (opts?.groupId != null)
+    url.searchParams.set("group_id", String(opts.groupId));
+  if (opts?.moduleId != null)
+    url.searchParams.set("module_id", String(opts.moduleId));
+  if (opts?.productId != null)
+    url.searchParams.set("product_id", String(opts.productId));
 
-  const res = await fetch(url.toString(), { method: "POST" });
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(txt || "Gagal generate sidebar");

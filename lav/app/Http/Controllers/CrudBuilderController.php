@@ -1186,6 +1186,7 @@ MD;
             $validations = '';
             $storeImageCode = '';
             $updateImageCode = "        \$oldFilesToDelete = [];\n";
+            $afterUpdateCleanup = '';
             $assignData = '';
             foreach ($fields as $field) {
                 $col = $field->nama_kolom;

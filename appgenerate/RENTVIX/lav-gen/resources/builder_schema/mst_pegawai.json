@@ -1,0 +1,21 @@
+{
+    "title": "Data Pegawai",
+    "menu_title": "Data Pegawai",
+    "table": "mst_pegawai",
+    "columns": [
+        {
+            "source": "nama",
+            "label": "New Content",
+            "display": "text"
+        },
+        {
+            "source": "alamat",
+            "label": "New Content",
+            "display": "text"
+        }
+    ],
+    "summary": {
+        "group_by": "status",
+        "sum": []
+    }
+}

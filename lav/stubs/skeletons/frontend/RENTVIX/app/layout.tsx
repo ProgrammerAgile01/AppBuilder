@@ -1,29 +1,28 @@
-import type React from "react"
-import type { Metadata } from "next"
-import "./globals.css"
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { LanguageProvider } from "@/lib/contexts/language-context"
-import { ThemeProvider } from "@/lib/contexts/theme-context"
-import { TemplateProvider } from "@/lib/contexts/template-context"
+import type React from "react";
+import type { Metadata } from "next";
+import "./globals.css";
+import { Providers } from "@/components/layout/providers";
+import { RootClientShell } from "@/components/layout/root-client-shell";
 
 export const metadata: Metadata = {
   title: "RentVix Pro - Vehicle Rental Management System",
   description: "Professional vehicle rental management system with PWA support",
   manifest: "/manifest.json",
   themeColor: "#3b82f6",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
+  viewport:
+    "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "RentVix Pro",
   },
-    generator: 'v0.dev'
-}
+  generator: "v0.dev",
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -36,14 +35,10 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="font-sans antialiased">
-        <ThemeProvider>
-          <LanguageProvider>
-            <TemplateProvider>
-              <SidebarProvider defaultOpen={true}>{children}</SidebarProvider>
-            </TemplateProvider>
-          </LanguageProvider>
-        </ThemeProvider>
+        <Providers>
+          <RootClientShell>{children}</RootClientShell>
+        </Providers>
       </body>
     </html>
-  )
+  );
 }
