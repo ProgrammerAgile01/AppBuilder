@@ -35,12 +35,14 @@ export function MenuItemForm({
   onSave,
   onCancel,
 }: MenuItemFormProps) {
+  /** ================= State ================= */
   const [formData, setFormData] = useState({
     title: "",
     url: "",
     icon: "",
-    parent_id: "",
-    crud_builder_id: "",
+    // IMPORTANT: simpan ID sebagai string untuk kompatibel dengan <Select>
+    parent_id: "" as string, // '' | 'id'
+    crud_builder_id: "" as string, // '' | 'id'
     is_active: true,
     order: undefined as number | undefined,
     level: undefined as number | undefined,
@@ -49,29 +51,48 @@ export function MenuItemForm({
   const [useCustomUrl, setUseCustomUrl] = useState(false);
   const [useCustomTitle, setUseCustomTitle] = useState(false);
 
+  /** ============== Derived ============== */
   // Hanya top-level menu (tanpa parent) selain dirinya
   const availableParentMenus = useMemo(
     () => existingMenus.filter((m) => !m.parent_id && m.id !== menuItem?.id),
     [existingMenus, menuItem?.id]
   );
 
+  // Dapatkan CRUD terpilih (bandingkan sebagai string)
   const selectedCrudBuilder = useMemo(
-    () => crudBuilders.find((c) => c.id === formData.crud_builder_id),
+    () => crudBuilders.find((c) => String(c.id) === formData.crud_builder_id),
     [crudBuilders, formData.crud_builder_id]
   );
 
+  // Helpers
+  function slugify(input: string): string {
+    if (!input) return "";
+    return input
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, "-");
+  }
+
+  /** ============== Effects (hydrate form) ============== */
   useEffect(() => {
     if (menuItem && menuItem.id) {
+      // Edit menu
       setFormData({
-        title: menuItem.title,
+        title: menuItem.title ?? "",
         url: menuItem.url || "",
         icon: menuItem.icon || "",
-        parent_id: menuItem.parent_id || "",
-        crud_builder_id: menuItem.crud_builder_id || "",
-        is_active: menuItem.is_active,
+        parent_id: menuItem.parent_id ? String(menuItem.parent_id) : "",
+        crud_builder_id: menuItem.crud_builder_id
+          ? String(menuItem.crud_builder_id)
+          : "",
+        is_active: !!menuItem.is_active,
         order: menuItem.order,
         level: menuItem.level,
       });
+
       const isCrudBased = !!menuItem.crud_builder_id;
       setUseCustomUrl(!isCrudBased);
       setUseCustomTitle(!isCrudBased);
@@ -80,6 +101,9 @@ export function MenuItemForm({
       setFormData((prev) => ({
         ...prev,
         parent_id: String(menuItem.parent_id),
+        title: prev.title || "",
+        url: prev.url || "",
+        crud_builder_id: "",
       }));
       setUseCustomUrl(true);
       setUseCustomTitle(true);
@@ -101,45 +125,68 @@ export function MenuItemForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuItem?.id, menuItem?.parent_id]);
 
+  // Auto-judul & auto-URL saat CRUD dipilih (kalau tidak custom title/url)
   useEffect(() => {
     if (!useCustomTitle && !useCustomUrl && formData.crud_builder_id) {
       const selectedCrud = crudBuilders.find(
-        (c) => c.id === formData.crud_builder_id
+        (c) => String(c.id) === formData.crud_builder_id
       );
       if (selectedCrud) {
-        setFormData((prev) => ({ ...prev, title: selectedCrud.menu_title }));
+        const menuTitle = selectedCrud.menu_title || "";
+        setFormData((prev) => ({
+          ...prev,
+          title: menuTitle,
+          url: slugify(menuTitle), // ✅ auto slugify untuk URL
+        }));
       }
     }
   }, [formData.crud_builder_id, crudBuilders, useCustomTitle, useCustomUrl]);
 
+  /** ============== Submit ============== */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    let finalUrl = formData.url;
-    if (!useCustomUrl && formData.crud_builder_id) {
-      const selectedCrud = crudBuilders.find(
-        (c) => c.id === formData.crud_builder_id
-      );
-      if (selectedCrud) {
-        finalUrl = `/admin/${selectedCrud.table_name}`;
-      }
+    const selectedCrud = formData.crud_builder_id
+      ? crudBuilders.find((c) => String(c.id) === formData.crud_builder_id)
+      : undefined;
+
+    // URL final
+    let finalUrl = "";
+    if (useCustomUrl) {
+      // kalau user input manual → slugify juga, dan pastikan ada prefix "/"
+      const raw = formData.url.trim();
+      finalUrl = raw.startsWith("/") ? raw : `/${slugify(raw)}`;
+    } else if (selectedCrud) {
+      // kalau dari CRUD → slugify menu_title / table_name
+      const basis = selectedCrud.menu_title || "";
+      finalUrl = `/${slugify(basis)}`;
     }
+
+    // parent_id yang dikirim ke onSave harus string | undefined
+    const parentIdStr =
+      formData.parent_id && formData.parent_id !== "none"
+        ? formData.parent_id
+        : "";
 
     onSave({
       title: formData.title,
-      url: finalUrl,
+      url: finalUrl || undefined,
       icon: formData.icon || undefined,
-      parent_id:
-        formData.parent_id === "none" ? "" : formData.parent_id || undefined,
+      // ✅ kirim string | undefined (bukan number)
+      parent_id: parentIdStr || undefined,
+      // ✅ kirim string | undefined (bukan number)
       crud_builder_id: useCustomUrl
         ? undefined
-        : formData.crud_builder_id || undefined,
+        : selectedCrud
+        ? String(selectedCrud.id)
+        : undefined,
       is_active: formData.is_active,
       order: formData.order,
-      level: formData.level, // tidak dipakai backend (auto), tapi biarkan ikut state untuk edit
+      level: formData.level,
     });
   };
 
+  /** ============== UI ============== */
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -162,6 +209,7 @@ export function MenuItemForm({
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Judul */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="title">Judul Menu *</Label>
@@ -176,7 +224,7 @@ export function MenuItemForm({
                       setUseCustomTitle(checked);
                       if (!checked && formData.crud_builder_id) {
                         const selectedCrud = crudBuilders.find(
-                          (c) => c.id === formData.crud_builder_id
+                          (c) => String(c.id) === formData.crud_builder_id
                         );
                         if (selectedCrud) {
                           setFormData((prev) => ({
@@ -211,12 +259,14 @@ export function MenuItemForm({
                   value={formData.crud_builder_id}
                   onValueChange={(value) => {
                     const selectedCrud = crudBuilders.find(
-                      (c) => c.id === value
+                      (c) => String(c.id) === value
                     );
                     setFormData((prev) => ({
                       ...prev,
-                      crud_builder_id: value,
-                      title: selectedCrud?.menu_title || "",
+                      crud_builder_id: value, // string
+                      title: useCustomTitle
+                        ? prev.title
+                        : selectedCrud?.menu_title || "",
                     }));
                   }}
                   required
@@ -226,7 +276,7 @@ export function MenuItemForm({
                   </SelectTrigger>
                   <SelectContent>
                     {crudBuilders.map((crud) => (
-                      <SelectItem key={crud.id} value={crud.id}>
+                      <SelectItem key={crud.id} value={String(crud.id)}>
                         {crud.menu_title}
                       </SelectItem>
                     ))}
@@ -235,6 +285,7 @@ export function MenuItemForm({
               )}
             </div>
 
+            {/* Parent */}
             {availableParentMenus.length > 0 && (
               <div className="space-y-2">
                 <Label htmlFor="parent">Parent Menu (Opsional)</Label>
@@ -255,7 +306,7 @@ export function MenuItemForm({
                       Tidak ada parent (Menu utama)
                     </SelectItem>
                     {availableParentMenus.map((menu) => (
-                      <SelectItem key={menu.id} value={menu.id}>
+                      <SelectItem key={menu.id} value={String(menu.id)}>
                         {menu.title}
                       </SelectItem>
                     ))}
@@ -264,6 +315,7 @@ export function MenuItemForm({
               </div>
             )}
 
+            {/* Sumber URL */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Sumber URL</Label>
@@ -314,11 +366,11 @@ export function MenuItemForm({
                     value={formData.crud_builder_id}
                     onValueChange={(value) => {
                       const selectedCrud = crudBuilders.find(
-                        (c) => c.id === value
+                        (c) => String(c.id) === value
                       );
                       setFormData((prev) => ({
                         ...prev,
-                        crud_builder_id: value,
+                        crud_builder_id: value, // string
                         title: useCustomTitle
                           ? prev.title
                           : selectedCrud?.menu_title || prev.title,
@@ -330,11 +382,11 @@ export function MenuItemForm({
                     </SelectTrigger>
                     <SelectContent>
                       {crudBuilders.map((crud) => (
-                        <SelectItem key={crud.id} value={crud.id}>
+                        <SelectItem key={crud.id} value={String(crud.id)}>
                           <div className="flex items-center gap-2">
                             <span>{crud.menu_title}</span>
                             <Badge variant="outline" className="text-xs">
-                              {crud.table_name}
+                              {crud.menu_title}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -344,13 +396,16 @@ export function MenuItemForm({
                   {selectedCrudBuilder && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <LinkIcon className="h-3 w-3" />
-                      <span>URL: /admin/{selectedCrudBuilder.table_name}</span>
+                      <span>
+                        URL: /{slugify(selectedCrudBuilder.menu_title || "")}
+                      </span>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
+            {/* Icon */}
             <div className="space-y-2">
               <IconSelector
                 value={formData.icon}
@@ -362,6 +417,7 @@ export function MenuItemForm({
               />
             </div>
 
+            {/* Aktif */}
             <div className="flex items-center justify-between">
               <Label htmlFor="is-active">Menu Aktif</Label>
               <Switch
@@ -373,6 +429,7 @@ export function MenuItemForm({
               />
             </div>
 
+            {/* Actions */}
             <div className="flex gap-2 pt-4">
               <Button
                 type="button"
