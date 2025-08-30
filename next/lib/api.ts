@@ -374,6 +374,90 @@ export async function forceDelete(entity: string, id: string) {
   return res.json();
 }
 
+export async function fetchTrashBoxFeatures(params?: {
+  product_id?: string | number;
+}): Promise<TrashBoxResponse> {
+  const q = new URLSearchParams();
+  if (params?.product_id) q.set("product_id", String(params.product_id));
+
+  const res = await fetch(`${API_URL}/fitur/trash-box?${q.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const json = await res.json().catch(() => ({}));
+  // Normalisasi agar selalu punya shape {success, totals, items}
+  return {
+    success: !!json?.success || true,
+    totals: json?.totals ?? { all: 0, category: 0, feature: 0, subfeature: 0 },
+    items: json?.items ??
+      json?.data ?? { category: [], feature: [], subfeature: [] },
+  };
+}
+
+/* ========== Generate fitur per product ========== */
+
+export async function generateFiturForProduct(
+  productId: string | number
+): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const res = await fetch(`${API_URL}/fitur/generate/${productId}`, {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return (await res.json().catch(() => ({}))) as any;
+}
+
+/* =========================
+   PRODUCTS (dropdown)
+   ========================= */
+// src/lib/api.ts
+
+export type Product = {
+  id: string;
+  name: string;
+  product_code: string;
+  status: "active" | "inactive";
+};
+
+function mapProduct(p: any): Product {
+  return {
+    id: String(p.id),
+    name: p.product_name ?? p.name ?? "",
+    product_code: p.product_code ?? p.slug ?? "",
+    status: (p.status === "inactive" ? "inactive" : "active") as
+      | "active"
+      | "inactive",
+  };
+}
+
+export async function fetchProduct(): Promise<Product[]> {
+  const res = await fetch(`${API_URL}/products`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Gagal memuat produk: ${res.status} ${txt}`);
+  }
+  const json = await res.json().catch(() => ({}));
+
+  // dukung berbagai bentuk respons (array langsung / {data:[]} / {data:{data:[]}} / {rows:[]})
+  const rows = Array.isArray(json)
+    ? json
+    : Array.isArray(json?.data)
+    ? json.data
+    : Array.isArray(json?.data?.data)
+    ? json.data.data
+    : Array.isArray(json?.rows)
+    ? json.rows
+    : [];
+
+  return rows.map(mapProduct);
+}
+
 export async function fetchMenus(opts?: { trash?: "none" | "with" | "only" }) {
   const url = new URL(`${API_URL}/menus`);
   if (opts?.trash) url.searchParams.set("trash", opts.trash);

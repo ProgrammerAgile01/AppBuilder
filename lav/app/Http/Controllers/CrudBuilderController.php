@@ -21,7 +21,7 @@ class CrudBuilderController extends Controller
     public function index()
     {
         try {
-            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
+            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
 
             return response()->json([
                 'success' => true,
@@ -243,7 +243,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil membuat builder',
-                'data' => $builder->load('product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -270,7 +270,7 @@ class CrudBuilderController extends Controller
     public function show($id)
     {
         try {
-            $builder = CrudBuilder::withCount('fields')->with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -407,7 +407,7 @@ class CrudBuilderController extends Controller
         DB::beginTransaction();
         try {
             // 2) AMBIL BUILDER
-            $builder = CrudBuilder::with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             // 3) UPDATE MASTER BUILDER
             $builder->update($request->only([
@@ -531,7 +531,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil memperbarui builder',
-                'data' => $builder->load('product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -573,7 +573,7 @@ class CrudBuilderController extends Controller
 
     public function deletedBuilder()
     {
-        $builder = CrudBuilder::onlyTrashed()->with(['product', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
+        $builder = CrudBuilder::onlyTrashed()->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
 
         $totalBuilderDihapus = CrudBuilder::onlyTrashed()->count();
 
@@ -676,7 +676,7 @@ class CrudBuilderController extends Controller
         File::ensureDirectoryExists($this->frontRoot);
 
         // Bootstrap(create) proyek jika belum ada
-        $this->bootstrapProductProjects();
+        $this->bootstrapProductProjects($builder);
 
         // readme instalasi
         $this->writeProductReadme($builder);
@@ -697,6 +697,23 @@ class CrudBuilderController extends Controller
     }
 
     /**
+     * HELPER Path UI Frontend.
+     */
+    private function getFrontendSkeletonPath($builder): string
+    {
+        $templateCode = $builder->product->templateFrontend->template_code ?? 'DEFAULT';
+
+        // Prioritas: skeleton khusus per-produk
+        $src = base_path("stubs/skeletons/frontend/{$templateCode}");
+        if (File::exists($src)) {
+            return $src;
+        }
+
+        // Fallback: skeleton umum Next 14
+        return base_path('stubs/skeletons/frontend/DEFAULT');
+    }
+
+    /**
      * BOOTSTRAP: COPY SKELETON → {PRODUCT}/lav-gen & next-gen.
      */
     private function copyDirectory(string $from, string $to): void
@@ -705,7 +722,39 @@ class CrudBuilderController extends Controller
         File::copyDirectory($from, $to);
     }
 
-    private function bootstrapProductProjects(): void
+    /**
+     * Generate Database name di env.
+     */
+    private function updateEnvDatabase($builder): void
+    {
+        $envPath = $this->backPath('.env');
+        $dbName  = $builder->product->db_name ?? null;
+
+        if (!$dbName) {
+            return; // tidak ada db_name di product
+        }
+
+        if (!File::exists($envPath) && File::exists($this->backPath('.env.example'))) {
+            File::copy($this->backPath('.env.example'), $envPath);
+        }
+
+        if (!File::exists($envPath)) {
+            return; // fallback: ga ada env
+        }
+
+        $content = File::get($envPath);
+
+        // cari DB_DATABASE=..., lalu ganti dengan db_name
+        if (preg_match('/^DB_DATABASE=.*$/m', $content)) {
+            $content = preg_replace('/^DB_DATABASE=.*$/m', "DB_DATABASE={$dbName}", $content);
+        } else {
+            $content .= "\nDB_DATABASE={$dbName}\n";
+        }
+
+        File::put($envPath, $content);
+    }
+
+    private function bootstrapProductProjects($builder): void
     {
         // Laravel skeleton
         if (!File::exists($this->backPath('composer.json'))) {
@@ -719,16 +768,19 @@ class CrudBuilderController extends Controller
             if (!File::exists($this->backPath('.env')) && File::exists($this->backPath('.env.example'))) {
                 File::copy($this->backPath('.env.example'), $this->backPath('.env'));
             }
-            // optional: tak perlu key:generate / storage:link di sini (bisa manual)
+
+            // masukkan nama database di env
+            $this->updateEnvDatabase($builder);
         }
 
         // Next skeleton
         if (!File::exists($this->frontPath('package.json'))) {
-            $src = base_path('stubs/skeletons/next-14');
-            if (File::exists($src)) {
-                $this->copyDirectory($src, $this->frontRoot);
+            $srcFront = $this->getFrontendSkeletonPath($builder);
+
+            if (File::exists($srcFront)) {
+                $this->copyDirectory($srcFront, $this->frontRoot);
             } else {
-                // kalau belum punya skeleton Next, buat folder minimal
+                // fallback minimal (harusnya tidak terjadi karena getFrontendSkeletonPath sudah fallback)
                 File::ensureDirectoryExists($this->frontPath('app'));
                 File::ensureDirectoryExists($this->frontPath('components'));
                 File::ensureDirectoryExists($this->frontPath('lib'));
@@ -751,6 +803,9 @@ class CrudBuilderController extends Controller
                 File::put($this->backPath('routes/api.php'), "<?php\nuse Illuminate\\Support\\Facades\\Route;\n");
             }
         }
+
+        // inject script instalasi
+        $this->injectSetupScriptsFromStub();
     }
 
     /**
@@ -805,6 +860,8 @@ class CrudBuilderController extends Controller
     private function writeProductReadme($builder, bool $overwrite = false): void
     {
         $product = $this->productSlug;
+        $templateName = $builder->product->templateFrontend->template_name ?? 'DEFAULT';
+
         $dest = $this->productPath('README.md');
 
         if (!$overwrite && File::exists($dest)) {
@@ -813,6 +870,12 @@ class CrudBuilderController extends Controller
 
         $md = <<<MD
 # {$product} — Hasil Generate
+
+**Jalankan setup_backend.ps1 dan setup_frontend.ps1**
+Jika error perlu administrator copy command dibawah
+
+
+**Template Frontend:** `{$templateName}`
 
 Folder ini berisi dua proyek:
 - **./lav-gen** — Laravel 12 (API)
@@ -859,6 +922,28 @@ MD;
     }
 
     /**
+     * Inject setup instalasi.
+     */
+    private function injectSetupScriptsFromStub(): void
+    {
+        // backend
+        $this->publishStub(
+            base_path('stubs/setup/setup_backend.ps1.stub'),
+            $this->backPath('setup_backend.ps1'),
+            repl: [],
+            overwrite: false
+        );
+
+        // frontend
+        $this->publishStub(
+            base_path('stubs/setup/setup_frontend.ps1.stub'),
+            $this->frontPath('setup_frontend.ps1'),
+            repl: [],
+            overwrite: false
+        );
+    }
+
+    /**
      * GENERATE — pakai skeleton.
      */
     private function scaffoldActionRuntimeOnce(): void
@@ -870,7 +955,7 @@ MD;
     {
         try {
             // load builder dengan relasi
-            $builder = CrudBuilder::with(['product', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             // Set root per product & bootstrap skeleton proyek jika belum ada
             $this->setProjectRoots($builder);
@@ -880,11 +965,12 @@ MD;
 
             // Data dasar
             $table = $builder->nama_tabel; // kendaraans
-            $entity = ucfirst(Str::studly($table)); // Kendaraan
+            $entity = ucfirst(Str::camel($builder->judul_menu)); // DataKendaraan
             $fields = collect($builder->fields)->map(callback: fn($f) => (object) $f);
             $fieldCategories = $builder->fieldCategories;
             $tableLayout = $builder->tableLayout;
             $cardLayouts = $builder->cardLayout;
+            $judulMenu = $builder->judul_menu;
 
             // generate migrasi
             $this->generateMigration($table, $builder->fields);
@@ -896,7 +982,7 @@ MD;
             $this->generateController($entity, $fields);
 
             // tambah route ke api.php
-            $this->appendRoute($table, $entity);
+            $this->appendRoute($judulMenu, $table, $entity);
 
             // export excel
             $this->generateExportExcel($table, $entity, $builder, $tableLayout);
@@ -908,7 +994,7 @@ MD;
             // Artisan::call('migrate');
 
             // generate frontend
-            $this->generateFrontend($table, $builder->fields, $builder->judul, $builder->deskripsi, $fieldCategories, $tableLayout, $cardLayouts);
+            $this->generateFrontend($judulMenu, $table, $builder->fields, $builder->judul, $builder->deskripsi, $fieldCategories, $tableLayout, $cardLayouts);
 
             // generate menu frontend
             // $this->updateFrontendMenu($table, $builder->modules->menu_title ?? 'Modul');
@@ -1099,7 +1185,7 @@ MD;
 
             $validations = '';
             $storeImageCode = '';
-            $updateImageCode = '';
+            $updateImageCode = "        \$oldFilesToDelete = [];\n";
             $assignData = '';
             foreach ($fields as $field) {
                 $col = $field->nama_kolom;
@@ -1167,12 +1253,20 @@ MD;
 PHP;
 
                     $updateImageCode .= <<<PHP
-            if (\$request->hasFile('$col')) {
-                \$data['$col'] = \$request->file('$col')->store('uploads/$tableName', 'public');
-            } else {
-                unset(\$data['$col']);
+            if (\$request->hasFile('{$col}')) {
+                \$old = \$row->{$col};
+                \$data['{$col}'] = \$request->file('{$col}')->store('uploads/{$tableName}', 'public');
+                if (!empty(\$old)) { \$oldFilesToDelete[] = \$old; }
             }
 PHP;
+
+                    $afterUpdateCleanup = <<<PHP
+            // hapus file lama setelah update sukses
+            foreach (\$oldFilesToDelete as \$oldPath) {
+                if (!empty(\$oldPath)) { \\Storage::disk('public')->delete(\$oldPath); }
+            }
+PHP;
+
                 } else {
                     $assignData .= "        \$data['$col'] = \$validated['$col'] ?? null;\n";
                 }
@@ -1193,13 +1287,14 @@ PHP;
                 base_path('stubs/controller.base.stub'),
                 $basePath,
                 [
-                    'MODEL_NAME'        => $modelName,
-                    'CONTROLLER_NAME'   => $controllerName,
-                    'ROUTE_PATH'        => $routePath,
-                    'VALIDATIONS'       => $validations,
-                    'ASSIGN_DATA'       => $assignData,
-                    'STORE_IMAGE_CODE'  => $storeImageCode,
-                    'UPDATE_IMAGE_CODE' => $updateImageCode,
+                    'MODEL_NAME'            => $modelName,
+                    'CONTROLLER_NAME'       => $controllerName,
+                    'ROUTE_PATH'            => $routePath,
+                    'VALIDATIONS'           => $validations,
+                    'ASSIGN_DATA'           => $assignData,
+                    'STORE_IMAGE_CODE'      => $storeImageCode,
+                    'UPDATE_IMAGE_CODE'     => $updateImageCode,
+                    'AFTER_UPDATE_CLEANUP'  => $afterUpdateCleanup,
                 ],
                 overwrite: true
             );
@@ -1220,12 +1315,12 @@ PHP;
         }
     }
 
-    private function appendRoute($table, $entity)
+    private function appendRoute($judulMenu, $table, $entity)
     {
         try {
             // $template = File::get(base_path('stubs/route.stub'));
 
-            $routePath = Str::kebab(Str::plural($table));
+            $routePath = Str::kebab(Str::plural($judulMenu));
             $controllerName = ucfirst(Str::camel($entity)) . 'Controller';
             
             $apiFile = $this->backPath('routes/api.php');
@@ -1422,15 +1517,15 @@ PHP;
     /**
      * FRONTEND CODEGEN (Next).
      */
-    private function generateFrontend($table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts)
+    private function generateFrontend($judulMenu, $table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts)
     {
         try {
-            $entity = Str::camel($table); // cth: namaFiles
-            $entityKebab = Str::kebab($table); // cth nama-files
-            $entityPlural = Str::kebab(Str::plural($table));
-            $entityPascal = Str::studly($table); // cth NamaFiles
-            $entitySnake = Str::snake($table); // cth nama_files
-            $entityHeadline = Str::headline($table); // cth Nama Files
+            $entity = Str::camel($judulMenu); // cth: namaFiles
+            $entityKebab = Str::kebab($judulMenu); // cth nama-files
+            $entityPlural = Str::kebab(Str::plural($judulMenu));
+            $entityPascal = Str::studly($judulMenu); // cth NamaFiles
+            $entitySnake = Str::snake($judulMenu); // cth nama_files
+            $entityHeadline = Str::headline($judulMenu); // cth Nama Files
 
             $singularSnake = Str::singular($entity); // nama_file
             $singularCamel = Str::camel($singularSnake); // namaFile
@@ -1761,7 +1856,9 @@ PHP;
             $status = $cardSchema['status']['field'] ?? null;
             $statusBadgeCase = '';
             $statusBadgeContent = '';
-            foreach ($cardSchema['status']['badge_options'] ?? [] as $badge) {
+            
+            if (!empty($cardSchema['status']['field']) && !empty($cardSchema['status']['badge_options'])) {
+                foreach ($cardSchema['status']['badge_options'] ?? [] as $badge) {
                 $statusBadgeCase .= "case '{$badge['value']}' : return <Badge className='bg-{$badge['color']}-100 text-{$badge['color']}-700'>{$badge['label']}</Badge>;\n";
             }
 
@@ -1773,6 +1870,8 @@ PHP;
     }
 })()}
 BADGE;      
+            }
+
             $infoContent = '';
             foreach ($cardSchema['infos'] ?? [] as $info) {
                 $infoField = $info['field'] ?? '';
@@ -1791,13 +1890,30 @@ BADGE;
     INFOS;
             }
 
-            
-            $value = $cardSchema['value']['field'] ?? null;
-            $valuePrefix = $cardSchema['value']['prefix'];
-            $valueSuffix = $cardSchema['value']['suffix'];
-            $valueSize = $cardSchema['value']['size'];
-            $valueWeight = $cardSchema['value']['weight'];
-            $valueColor = $cardSchema['value']['color'];
+            $valueContent = '';
+
+            if (!empty($cardSchema['value']['field'])) {
+                $valueField  = $cardSchema['value']['field'];
+                $valuePrefix = $cardSchema['value']['prefix'] ?? '';
+                $valueSuffix = $cardSchema['value']['suffix'] ?? '';
+                $valueSize   = $cardSchema['value']['size'] ?? 'base';
+                $valueWeight = $cardSchema['value']['weight'] ?? 'normal';
+                $valueColor  = $cardSchema['value']['color'] ?? 'black';
+
+                $valueContent = <<<VALUE
+            <span className="font-{$valueWeight} text-{$valueSize} {$valueColor}">
+            {$valuePrefix} {formatRupiah(filtered{$singularPascal}.{$valueField})}{$valueSuffix}
+            </span>
+            VALUE;
+            }
+
+            // old value
+            // $value = $cardSchema['value']['field'] ?? null;
+            // $valuePrefix = $cardSchema['value']['prefix'];
+            // $valueSuffix = $cardSchema['value']['suffix'];
+            // $valueSize = $cardSchema['value']['size'];
+            // $valueWeight = $cardSchema['value']['weight'];
+            // $valueColor = $cardSchema['value']['color'];
 
             // $actions  = $cardSchema['actions']    ?? [];
 
@@ -1817,12 +1933,7 @@ BADGE;
                 '{{STATUS}}',
                 '{{STATUS_BADGE}}',
                 '{{INFO}}',
-                '{{VALUE}}',
-                '{{VALUE_PREFIX}}',
-                '{{VALUE_SUFFIX}}',
-                '{{VALUE_SIZE}}',
-                '{{VALUE_WEIGHT}}',
-                '{{VALUE_COLOR}}',
+                '{{VALUE_CONTENT}}',
                 '{{ENTITY_PASCAL_SINGULAR}}',
                 '{{ENTITY_KEBAB_SINGULAR}}'
             ], [
@@ -1840,12 +1951,7 @@ BADGE;
                 $status,
                 $statusBadgeContent,
                 $infoContent,
-                $value,
-                $valuePrefix,
-                $valueSuffix,
-                $valueSize,
-                $valueWeight,
-                $valueColor,
+                $valueContent,
                 $singularPascal,
                 $singularKebab
             ], $cardStub);
@@ -1953,7 +2059,7 @@ BADGE;
                                 $imgFit = $col->image_settings['fit'] ?? 'cover';
                                 $imgRadius = $col->image_settings['border_radius'] ?? '0.5rem';
 
-                                $cellContent .= "<img src={item.{$source}} alt='' className='w-[{$imgWidth}px] h-[{$imgHeight}px] object-{$imgFit} rounded-[{$imgRadius}]' />\n";
+                                $cellContent .= "<img src={item.{$source}_url} alt='' className='w-[{$imgWidth}px] h-[{$imgHeight}px] object-{$imgFit} rounded-[{$imgRadius}]' />\n";
                                 break;
                             
                             case 'badge':

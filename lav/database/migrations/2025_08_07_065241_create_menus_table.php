@@ -16,6 +16,7 @@ return new class extends Migration {
             $table->string('color', 32)->nullable();
             $table->integer('order_number')->default(0);
             $table->foreignId('crud_builder_id')->nullable()->constrained('crud_builders')->onDelete('set null');
+            $table->string('product_code', 64)->index()->nullable();
             $table->string('route_path')->nullable();
             $table->boolean('is_active')->default(true);
             $table->text('note')->nullable();

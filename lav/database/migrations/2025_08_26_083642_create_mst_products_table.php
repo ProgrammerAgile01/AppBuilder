@@ -10,6 +10,7 @@ return new class extends Migration {
     {
         Schema::create('mst_products', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->string('db_name', 60)->unique();
             $table->string('product_code', 64)->unique();
             $table->string('product_name', 160);
             $table->enum('status', ['active','inactive','archived'])->default('active');

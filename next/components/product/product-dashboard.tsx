@@ -59,6 +59,7 @@ import {
 interface Product {
   id: string;
   template: string;
+  dbName: string;
   productCode: string;
   productName: string;
   status: "Active" | "Inactive" | "Archived";
@@ -77,6 +78,21 @@ const toTitle = (s: string) =>
     : s ?? "Active";
 const toLower = (s: Product["status"]) => s.toLowerCase();
 
+// helper db_name dari product code → snake_case (maks 60 char)
+function toDbNameSuggestion(src: string) {
+  const s = (src || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_");
+  return s.slice(0, 60) || "";
+}
+
+// validasi ringan db_name
+function isValidDbName(s: string) {
+  return /^[A-Za-z0-9_]{1,60}$/.test(s);
+}
+
 export function ProductDashboard() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -84,8 +100,10 @@ export function ProductDashboard() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [dbEdited, setDbEdited] = useState(false);
   const [formData, setFormData] = useState({
     template: "",
+    dbName: "",
     productCode: "",
     productName: "",
     status: "Active" as Product["status"],
@@ -108,10 +126,10 @@ export function ProductDashboard() {
   >([]);
 
   useEffect(() => {
-    fetchTemplateFrontend("template-frontend", { status: "active"})
+    fetchTemplateFrontend("template-frontend", { status: "active" })
       .then(setTemplates)
       .catch(() => {
-        console.log('error load template frontend')
+        console.log("error load template frontend");
       });
   }, []);
 
@@ -133,6 +151,7 @@ export function ProductDashboard() {
       const mapped: Product[] = arr.map((it) => ({
         id: String(it.id),
         template: String(it.template_frontend_id),
+        dbName: it.db_name,
         productCode: it.product_code,
         productName: it.product_name,
         status: toTitle(it.status) as Product["status"],
@@ -176,9 +195,17 @@ export function ProductDashboard() {
       if (
         !formData.productCode ||
         !formData.productName ||
-        !formData.template
+        !formData.template ||
+        !formData.dbName
       ) {
         toast.error("Semua field harus diisi");
+        return;
+      }
+
+      if (!isValidDbName(formData.dbName)) {
+        toast.error(
+          "Database Name hanya boleh huruf/angka/underscore (maks 60)"
+        );
         return;
       }
 
@@ -193,6 +220,7 @@ export function ProductDashboard() {
 
       const payload = {
         template_frontend_id: formData.template,
+        db_name: formData.dbName.toLowerCase(),
         product_code: formData.productCode.toUpperCase(),
         product_name: formData.productName,
         status: toLower(formData.status),
@@ -203,6 +231,7 @@ export function ProductDashboard() {
       setIsCreateDialogOpen(false);
       setFormData({
         template: "",
+        dbName: "",
         productCode: "",
         productName: "",
         status: "Active",
@@ -219,9 +248,17 @@ export function ProductDashboard() {
         !editingProduct ||
         !formData.productCode ||
         !formData.productName ||
-        !formData.template
+        !formData.template ||
+        !formData.dbName
       ) {
         toast.error("Semua field harus diisi");
+        return;
+      }
+
+      if (!isValidDbName(formData.dbName)) {
+        toast.error(
+          "Database Name hanya boleh huruf/angka/underscore (maks 60)"
+        );
         return;
       }
 
@@ -237,6 +274,7 @@ export function ProductDashboard() {
 
       const payload = {
         template_frontend_id: formData.template,
+        db_name: formData.dbName.toLowerCase(),
         product_code: formData.productCode.toUpperCase(),
         product_name: formData.productName,
         status: toLower(formData.status),
@@ -248,6 +286,7 @@ export function ProductDashboard() {
       setEditingProduct(null);
       setFormData({
         template: "",
+        dbName: "",
         productCode: "",
         productName: "",
         status: "Active",
@@ -279,13 +318,18 @@ export function ProductDashboard() {
   }
 
   const openEditDialog = (product: Product) => {
+    const suggest = !product.dbName
+      ? toDbNameSuggestion(product.productCode)
+      : product.dbName;
     setEditingProduct(product);
     setFormData({
       template: product.template,
+      dbName: suggest,
       productCode: product.productCode,
       productName: product.productName,
       status: product.status,
     });
+    setDbEdited(!!product.dbName); // kalau kosong -> auto boleh isi, kalau ada -> anggap manual
     setIsEditDialogOpen(true);
   };
 
@@ -365,6 +409,7 @@ export function ProductDashboard() {
       const mapped: Product[] = arr.map((it) => ({
         id: String(it.id),
         template: String(it.template_frontend_id),
+        dbName: it.db_name,
         productCode: it.product_code,
         productName: it.product_name,
         status: toTitle(it.status) as Product["status"],
@@ -477,8 +522,8 @@ export function ProductDashboard() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Product Code</TableHead>
-                          <TableHead>Template Frontend</TableHead>
                           <TableHead>Product Name</TableHead>
+                          <TableHead>Template Frontend</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -488,7 +533,9 @@ export function ProductDashboard() {
                             <TableCell className="font-mono">
                               {p.productCode}
                             </TableCell>
-                            <TableCell className="font-medium">{p.productName}</TableCell>
+                            <TableCell className="font-medium">
+                              {p.productName}
+                            </TableCell>
                             <TableCell>
                               {templates.find((t) => t.value === p.template)
                                 ?.label ?? p.template}
@@ -538,7 +585,19 @@ export function ProductDashboard() {
           {/* Tombol Add Product (tetap) */}
           <Dialog
             open={isCreateDialogOpen}
-            onOpenChange={setIsCreateDialogOpen}
+            onOpenChange={(open) => {
+              setIsCreateDialogOpen(open);
+              if (open) {
+                setDbEdited(false);
+                setFormData({
+                  template: "",
+                  dbName: "",
+                  productCode: "",
+                  productName: "",
+                  status: "Active",
+                });
+              }
+            }}
           >
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
@@ -560,12 +619,17 @@ export function ProductDashboard() {
                     id="productCode"
                     placeholder="RENTVIX"
                     value={formData.productCode}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        productCode: e.target.value.toUpperCase(),
-                      })
-                    }
+                    onChange={(e) => {
+                      const code = e.target.value.toUpperCase();
+                      setFormData((prev) => ({
+                        ...prev,
+                        productCode: code,
+                        // kalau user belum mengedit manual, isi otomatis
+                        dbName: dbEdited
+                          ? prev.dbName
+                          : toDbNameSuggestion(code),
+                      }));
+                    }}
                   />
                 </div>
                 <div>
@@ -576,6 +640,24 @@ export function ProductDashboard() {
                     value={formData.productName}
                     onChange={(e) =>
                       setFormData({ ...formData, productName: e.target.value })
+                    }
+                  />
+                </div>
+                {/* Database NAME */}
+                <div>
+                  <Label htmlFor="dbName">Database Name</Label>
+                  <Input
+                    id="dbName"
+                    placeholder="rentvix_pro"
+                    value={formData.dbName}
+                    onFocus={() => setDbEdited(true)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        dbName: e.target.value
+                          .replace(/[^A-Za-z0-9_]/g, "_")
+                          .slice(0, 60),
+                      })
                     }
                   />
                 </div>
@@ -746,6 +828,7 @@ export function ProductDashboard() {
                 <TableRow>
                   <TableHead>Product Code</TableHead>
                   <TableHead>Product Name</TableHead>
+                  <TableHead>Database Name</TableHead>
                   <TableHead>Template</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
@@ -762,6 +845,7 @@ export function ProductDashboard() {
                     <TableCell className="font-medium">
                       {product.productName}
                     </TableCell>
+                    <TableCell className="font-mono">{product.dbName}</TableCell>
                     <TableCell>
                       {templates.find((t) => t.value === product.template)
                         ?.label ?? product.template}
@@ -841,6 +925,22 @@ export function ProductDashboard() {
                 value={formData.productName}
                 onChange={(e) =>
                   setFormData({ ...formData, productName: e.target.value })
+                }
+              />
+            </div>
+            {/* Database NAME */}
+            <div>
+              <Label htmlFor="editDbName">Database Name</Label>
+              <Input
+                id="editDbName"
+                value={formData.dbName}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dbName: e.target.value
+                      .replace(/[^A-Za-z0-9_]/g, "_")
+                      .slice(0, 60),
+                  })
                 }
               />
             </div>

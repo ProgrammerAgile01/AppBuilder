@@ -1,78 +1,52 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Icons from "lucide-react";
-
 import {
-  Plus,
-  Eye,
-  EyeOff,
-  ChevronRight,
-  Folder,
-  FileText,
-  MenuIcon,
-  Edit,
-  Trash2,
-  MoreHorizontal,
-  Zap, // tombol Generate
+  Plus, Eye, EyeOff, ChevronRight, Folder, FileText,
+  MenuIcon, Edit, Trash2, MoreHorizontal, Zap
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+
 import { ModuleGroupForm } from "./module-group-form";
 import { ModuleForm } from "./module-form";
 import { MenuItemForm } from "./menu-item-form";
 import { MenuTrash } from "./menu-trash";
 import { MenuTree } from "./menu-tree";
 import { MenuPreview } from "./menu-preview";
-import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 import type {
-  ModuleGroup,
-  Module,
-  MenuItem,
-  MenuStructure,
-  BackendMenu,
-  CrudBuilderOption,
+  ModuleGroup, Module, MenuItem, MenuStructure,
+  BackendMenu, CrudBuilderOption, Product,
 } from "@/types/menu";
 
 import {
-  fetchMenus,
-  fetchMenusTreeWithTrashed,
-  fetchMenusOnlyTrashed,
-  createData,
-  updateData,
-  fetchCrudBuilders,
-  deleteMenu,
-  restoreMenu,
-  forceDeleteMenu,
-  generateFrontendMenu, // helper API generate
+  fetchMenusTreeWithTrashed, fetchMenusOnlyTrashed,
+  createData, updateData, fetchCrudBuilders,
+  deleteMenu, restoreMenu, forceDeleteMenu,
+  generateFrontendMenu, fetchProduct,
 } from "@/lib/api";
 
-/* ===== util icon lucide agar nama bebas (file-text, file_text, FileText) ===== */
+/* ===== util icon lucide agar nama bebas ===== */
 const normalizeLucideName = (name?: string) => {
   if (!name) return "Folder";
-  const cleaned = String(name)
-    .replace(/\s+/g, "")
-    .replace(/[-_](.)/g, (_: any, c: string) => c.toUpperCase());
+  const cleaned = String(name).replace(/\s+/g, "").replace(/[-_](.)/g, (_: any, c: string) => c.toUpperCase());
   const pascal = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
   const map: Record<string, string> = {
     filetext: "FileText",
@@ -86,7 +60,6 @@ const normalizeLucideName = (name?: string) => {
   };
   return map[pascal.toLowerCase()] ?? pascal;
 };
-
 const renderIcon = (name?: string, className = "h-4 w-4") => {
   const key = normalizeLucideName(name);
   const Cmp = (Icons as any)[key] ?? Icons.Folder;
@@ -96,26 +69,15 @@ const renderIcon = (name?: string, className = "h-4 w-4") => {
 /* ================================
    Mapper: Backend -> UI (AKTIF)
    ================================ */
-function mapApiToMenuStructure(apiMenus: BackendMenu[]): {
-  groups: ModuleGroup[];
-} {
+function mapApiToMenuStructure(apiMenus: BackendMenu[]): { groups: ModuleGroup[] } {
   const groups: ModuleGroup[] = [];
-
   const rawChildren = (node: BackendMenu): BackendMenu[] =>
     node.recursive_children ?? (node as any).recursiveChildren ?? [];
 
-  // filter out yang soft-deleted untuk struktur AKTIF
   const getChildren = (node: BackendMenu): BackendMenu[] =>
     (rawChildren(node) || []).filter((c: any) => !c?.deleted_at);
 
-  const palette = [
-    "#3b82f6",
-    "#10b981",
-    "#f59e0b",
-    "#ef4444",
-    "#8b5cf6",
-    "#06b6d4",
-  ];
+  const palette = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
 
   const topGroups = (apiMenus || [])
     .filter((g: any) => g.type === "group" && !g?.deleted_at)
@@ -135,6 +97,8 @@ function mapApiToMenuStructure(apiMenus: BackendMenu[]): {
       modules: [],
       created_at: groupApi.created_at,
       updated_at: groupApi.updated_at,
+      product_id: groupApi.product_id ? String(groupApi.product_id) : undefined,
+      product_code: groupApi.product_code ?? undefined,
     };
 
     const moduleNodes = getChildren(groupApi)
@@ -155,31 +119,25 @@ function mapApiToMenuStructure(apiMenus: BackendMenu[]): {
         menus: [],
         created_at: moduleApi.created_at,
         updated_at: moduleApi.updated_at,
+        product_id: moduleApi.product_id ? String(moduleApi.product_id) : undefined,
+        product_code: moduleApi.product_code ?? undefined,
       };
 
       const menuMap: Record<string, MenuItem> = {};
-
       const collectMenus = (parentNode: BackendMenu) => {
         const children = getChildren(parentNode) || [];
         children.forEach((child: any) => {
           if (child?.deleted_at) return;
-
           if (child.type === "menu") {
             const isTopLevel =
-              child.parent_id === null ||
-              String(child.parent_id) === String(moduleApi.id);
-
+              child.parent_id === null || String(child.parent_id) === String(moduleApi.id);
             const item: MenuItem = {
               id: String(child.id),
               title: child.title,
               url: child.route_path ?? undefined,
               icon: child.icon ?? undefined,
               order: child.order_number ?? 0,
-              parent_id: isTopLevel
-                ? undefined
-                : child.parent_id
-                ? String(child.parent_id)
-                : undefined,
+              parent_id: isTopLevel ? undefined : (child.parent_id ? String(child.parent_id) : undefined),
               level:
                 typeof child.level === "number" && child.level > 0
                   ? child.level
@@ -187,16 +145,15 @@ function mapApiToMenuStructure(apiMenus: BackendMenu[]): {
                   ? ((moduleApi as any).level ?? 2) + 1
                   : ((parentNode as any).level ?? 2) + 1,
               crud_builder_id:
-                (child as any).crud_builder_id != null
-                  ? String((child as any).crud_builder_id)
-                  : undefined,
+                (child as any).crud_builder_id != null ? String((child as any).crud_builder_id) : undefined,
               is_active: child.is_active,
               is_deleted: !!child.deleted_at,
               deleted_at: child.deleted_at,
               created_at: child.created_at,
               updated_at: child.updated_at,
+              product_id: child.product_id ? String(child.product_id) : undefined,
+              product_code: child.product_code ?? undefined,
             };
-
             menuMap[item.id] = item;
             collectMenus(child);
           } else {
@@ -204,13 +161,11 @@ function mapApiToMenuStructure(apiMenus: BackendMenu[]): {
           }
         });
       };
-
       collectMenus(moduleApi);
 
       Object.values(menuMap)
         .sort((a, b) => a.order - b.order)
         .forEach((m) => module.menus.push(m));
-
       group.modules.push(module);
     });
 
@@ -221,7 +176,7 @@ function mapApiToMenuStructure(apiMenus: BackendMenu[]): {
 }
 
 /* =========================================
-   Mapper: Backend (TRASH) -> tipe UI (TRASH)
+   Mapper TRASH (flat onlyTrashed -> tipe UI)
    ========================================= */
 function mapTrashGroups(apiMenus: BackendMenu[]): ModuleGroup[] {
   return apiMenus
@@ -239,9 +194,10 @@ function mapTrashGroups(apiMenus: BackendMenu[]): ModuleGroup[] {
       modules: [],
       created_at: g.created_at,
       updated_at: g.updated_at,
+      product_id: g.product_id ? String(g.product_id) : undefined,
+      product_code: g.product_code ?? undefined,
     }));
 }
-
 function mapTrashModules(apiMenus: BackendMenu[]): Module[] {
   return apiMenus
     .filter((m) => m.type === "module" && !!m.deleted_at)
@@ -258,9 +214,10 @@ function mapTrashModules(apiMenus: BackendMenu[]): Module[] {
       menus: [],
       created_at: m.created_at,
       updated_at: m.updated_at,
+      product_id: m.product_id ? String(m.product_id) : undefined,
+      product_code: m.product_code ?? undefined,
     }));
 }
-
 function mapTrashMenus(apiMenus: BackendMenu[]): MenuItem[] {
   return apiMenus
     .filter((n) => n.type === "menu" && !!n.deleted_at)
@@ -273,92 +230,103 @@ function mapTrashMenus(apiMenus: BackendMenu[]): MenuItem[] {
       parent_id: n.parent_id ? String(n.parent_id) : undefined,
       level: typeof n.level === "number" ? n.level : 0,
       crud_builder_id:
-        (n as any).crud_builder_id != null
-          ? String((n as any).crud_builder_id)
-          : undefined,
+        (n as any).crud_builder_id != null ? String((n as any).crud_builder_id) : undefined,
       is_active: n.is_active,
       is_deleted: true,
       deleted_at: n.deleted_at,
       created_at: n.created_at,
       updated_at: n.updated_at,
+      product_id: n.product_id ? String(n.product_id) : undefined,
+      product_code: n.product_code ?? undefined,
     }));
 }
 
 export function MenuManagement() {
-  const [menuStructure, setMenuStructure] = useState<MenuStructure>({
-    groups: [],
-    crud_builders: [],
-  });
+  const [menuStructure, setMenuStructure] = useState<MenuStructure>({ groups: [], crud_builders: [] });
 
-  // === Tambahan: state untuk TRASH ===
+  // TRASH
   const [trashedGroups, setTrashedGroups] = useState<ModuleGroup[]>([]);
   const [trashedModules, setTrashedModules] = useState<Module[]>([]);
   const [trashedMenus, setTrashedMenus] = useState<MenuItem[]>([]);
 
+  // Produk
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // selections
   const [selectedGroup, setSelectedGroup] = useState<ModuleGroup | null>(null);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(
-    null
-  );
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
 
+  // UI flags
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [showModuleForm, setShowModuleForm] = useState(false);
   const [showMenuForm, setShowMenuForm] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
 
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    type: "group" | "module" | "menu";
-    item: any;
-  }>({ open: false, type: "group", item: null });
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; type: "group" | "module" | "menu"; item: any; }>
+  ({ open: false, type: "group", item: null });
 
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false); // status generate
+  const [generating, setGenerating] = useState(false);
   const { toast } = useToast();
 
-  // Data aktif (untuk UI utama)
   const activeGroups = menuStructure.groups.filter((g) => !g.is_deleted);
-
-  // Badge sampah menggunakan state trash baru
-  const trashCount =
-    trashedGroups.length + trashedModules.length + trashedMenus.length;
+  const trashCount = trashedGroups.length + trashedModules.length + trashedMenus.length;
 
   useEffect(() => {
-    loadMenuStructure();
+    (async () => {
+      try {
+        const prods = await fetchProduct();
+        setProducts(prods);
+        // auto-pilih product pertama (opsional)
+        setSelectedProduct((prev) => prev ?? prods[0] ?? null);
+      } catch (e: any) {
+        toast({ title: "Gagal memuat produk", description: e?.message ?? String(e), variant: "destructive" });
+      }
+    })();
   }, []);
+
+  useEffect(() => {
+    // reload struktur saat product berganti
+    loadMenuStructure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProduct?.id]);
 
   const loadMenuStructure = async () => {
     try {
       setLoading(true);
+      const pid = selectedProduct?.id;
 
-      // 1) Tree untuk tampilan utama (root + recursiveChildren), include trashed di relasi
-      // 2) Flat only-trashed untuk modal Sampah
       const [treeWith, onlyTrashed, crudBuilders] = await Promise.all([
-        fetchMenusTreeWithTrashed(),
-        fetchMenusOnlyTrashed(),
+        fetchMenusTreeWithTrashed(pid),
+        fetchMenusOnlyTrashed(pid),
         fetchCrudBuilders(),
       ]);
 
-      // Bangun struktur aktif (mapper mem-filter deleted_at)
       const { groups } = mapApiToMenuStructure(treeWith);
       setMenuStructure({ groups, crud_builders: crudBuilders });
 
-      // Isi sampah dari flat onlyTrashed → paling andal untuk semua level
       setTrashedGroups(mapTrashGroups(onlyTrashed));
       setTrashedModules(mapTrashModules(onlyTrashed));
       setTrashedMenus(mapTrashMenus(onlyTrashed));
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.message || "Gagal memuat struktur menu",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error?.message || "Gagal memuat struktur menu", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
+  /* =====================
+     SAVE handlers (kirim product_id & product_code)
+     ===================== */
+  const safeProductPayload = () => ({
+    product_id: selectedProduct?.id ?? null,
+    product_code: selectedProduct?.product_code ?? null,
+  });
+
   const handleSaveGroup = async (groupData: Partial<ModuleGroup>) => {
+    const prod = safeProductPayload();
     try {
       if (selectedGroup) {
         await updateData("menus", selectedGroup.id, {
@@ -370,11 +338,9 @@ export function MenuManagement() {
           type: "group",
           parent_id: null,
           order_number: groupData.order ?? selectedGroup.order,
+          ...prod,
         });
-        toast({
-          title: "Berhasil",
-          description: "Kelompok modul berhasil diperbarui",
-        });
+        toast({ title: "Berhasil", description: "Kelompok modul berhasil diperbarui" });
       } else {
         await createData("menus", {
           title: groupData.name,
@@ -385,26 +351,21 @@ export function MenuManagement() {
           parent_id: null,
           is_active: true,
           order_number: (menuStructure.groups?.length ?? 0) + 1,
+          ...prod,
         });
-        toast({
-          title: "Berhasil",
-          description: "Kelompok modul berhasil ditambahkan",
-        });
+        toast({ title: "Berhasil", description: "Kelompok modul berhasil ditambahkan" });
       }
       setShowGroupForm(false);
       setSelectedGroup(null);
       await loadMenuStructure();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Gagal menyimpan kelompok modul",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Gagal menyimpan kelompok modul", variant: "destructive" });
     }
   };
 
   const handleSaveModule = async (moduleData: Partial<Module>) => {
     if (!selectedGroup) return;
+    const prod = safeProductPayload();
     try {
       if (selectedModule) {
         await updateData("menus", selectedModule.id, {
@@ -415,6 +376,7 @@ export function MenuManagement() {
           type: "module",
           parent_id: selectedGroup.id,
           order_number: moduleData.order ?? selectedModule.order,
+          ...prod,
         });
         toast({ title: "Berhasil", description: "Modul berhasil diperbarui" });
       } else {
@@ -426,6 +388,7 @@ export function MenuManagement() {
           parent_id: selectedGroup.id,
           is_active: true,
           order_number: (selectedGroup.modules?.length ?? 0) + 1,
+          ...prod,
         });
         toast({ title: "Berhasil", description: "Modul berhasil ditambahkan" });
       }
@@ -433,16 +396,13 @@ export function MenuManagement() {
       setSelectedModule(null);
       await loadMenuStructure();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Gagal menyimpan modul",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Gagal menyimpan modul", variant: "destructive" });
     }
   };
 
   const handleSaveMenuItem = async (menuItemData: Partial<MenuItem>) => {
     if (!selectedModule) return;
+    const prod = safeProductPayload();
     try {
       if (selectedMenuItem?.id) {
         await updateData("menus", selectedMenuItem.id, {
@@ -450,12 +410,11 @@ export function MenuManagement() {
           route_path: menuItemData.url,
           icon: menuItemData.icon,
           is_active: menuItemData.is_active,
-          parent_id: menuItemData.parent_id
-            ? menuItemData.parent_id
-            : selectedModule.id,
+          parent_id: menuItemData.parent_id ? menuItemData.parent_id : selectedModule.id,
           crud_builder_id: menuItemData.crud_builder_id || null,
           type: "menu",
           order_number: menuItemData.order ?? selectedMenuItem.order,
+          ...prod,
         });
         toast({ title: "Berhasil", description: "Menu berhasil diperbarui" });
       } else {
@@ -469,6 +428,7 @@ export function MenuManagement() {
           is_active: menuItemData.is_active ?? true,
           crud_builder_id: menuItemData.crud_builder_id || null,
           order_number: (selectedModule.menus?.length ?? 0) + 1,
+          ...prod,
         });
         toast({ title: "Berhasil", description: "Menu berhasil ditambahkan" });
       }
@@ -476,132 +436,79 @@ export function MenuManagement() {
       setSelectedMenuItem(null);
       await loadMenuStructure();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Gagal menyimpan menu",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message || "Gagal menyimpan menu", variant: "destructive" });
     }
   };
 
-  /* ==============
-     Generate file
-     ============== */
+  /* ============== Generate file (ikut product) ============== */
   const handleGenerate = async () => {
     try {
       setGenerating(true);
-      // generate keseluruhan file app-sidebar.tsx
-      await generateFrontendMenu();
-      toast({
-        title: "Berhasil",
-        description: "Sidebar berhasil digenerate.",
-      });
+      await generateFrontendMenu({ productId: selectedProduct?.id || undefined });
+      toast({ title: "Berhasil", description: "Sidebar berhasil digenerate." });
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err?.message || "Gagal generate sidebar",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err?.message || "Gagal generate sidebar", variant: "destructive" });
     } finally {
       setGenerating(false);
     }
   };
 
-  /* ================================
-     Soft Delete / Restore / Force
-     ================================ */
+  /* ================================  Soft Delete / Restore / Force  ================================ */
   const handleDelete = async () => {
     const { type, item } = deleteDialog;
     if (!item?.id) return;
-
     try {
-      await deleteMenu(String(item.id)); // soft delete
-
+      await deleteMenu(String(item.id));
       if (type === "group") {
         if (selectedGroup?.id === item.id) {
           setSelectedGroup(null);
           setSelectedModule(null);
           setSelectedMenuItem(null);
         }
-        toast({
-          title: "Berhasil",
-          description: "Kelompok modul dipindahkan ke sampah",
-        });
+        toast({ title: "Berhasil", description: "Kelompok modul dipindahkan ke sampah" });
       } else if (type === "module") {
         if (selectedModule?.id === item.id) {
           setSelectedModule(null);
           setSelectedMenuItem(null);
         }
-        toast({
-          title: "Berhasil",
-          description: "Modul dipindahkan ke sampah",
-        });
+        toast({ title: "Berhasil", description: "Modul dipindahkan ke sampah" });
       } else {
         if (selectedMenuItem?.id === item.id) setSelectedMenuItem(null);
         toast({ title: "Berhasil", description: "Menu dipindahkan ke sampah" });
       }
-
       await loadMenuStructure();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.message || "Gagal menghapus item",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error?.message || "Gagal menghapus item", variant: "destructive" });
     } finally {
       setDeleteDialog({ open: false, type: "group", item: null });
     }
   };
 
-  const handleRestore = async (
-    type: "group" | "module" | "menu",
-    item: any
-  ) => {
+  const handleRestore = async (type: "group" | "module" | "menu", item: any) => {
     if (!item?.id) return;
     try {
       await restoreMenu(String(item.id));
       toast({
         title: "Dipulihkan",
-        description:
-          type === "group"
-            ? "Kelompok modul dipulihkan."
-            : type === "module"
-            ? "Modul dipulihkan."
-            : "Menu dipulihkan.",
+        description: type === "group" ? "Kelompok modul dipulihkan." : type === "module" ? "Modul dipulihkan." : "Menu dipulihkan.",
       });
       await loadMenuStructure();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.message || "Gagal memulihkan item",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error?.message || "Gagal memulihkan item", variant: "destructive" });
     }
   };
 
-  const handlePermanentDelete = async (
-    type: "group" | "module" | "menu",
-    item: any
-  ) => {
+  const handlePermanentDelete = async (type: "group" | "module" | "menu", item: any) => {
     if (!item?.id) return;
     try {
       await forceDeleteMenu(String(item.id));
       toast({
         title: "Terhapus Permanen",
-        description:
-          type === "group"
-            ? "Kelompok modul dihapus permanen."
-            : type === "module"
-            ? "Modul dihapus permanen."
-            : "Menu dihapus permanen.",
+        description: type === "group" ? "Kelompok modul dihapus permanen." : type === "module" ? "Modul dihapus permanen." : "Menu dihapus permanen.",
       });
       await loadMenuStructure();
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.message || "Gagal menghapus permanen item",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error?.message || "Gagal menghapus permanen item", variant: "destructive" });
     }
   };
 
@@ -618,14 +525,42 @@ export function MenuManagement() {
 
   return (
     <div className="space-y-6">
-      {/* <h2 className="text-2xl font-bold">Pengaturan Menu</h2> */}
+      {/* FILTER BAR */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Select Produk */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Product</span>
+          <Select
+            value={selectedProduct?.id ?? ""}
+            onValueChange={(val) => {
+              const next = products.find((p) => p.id === val) ?? null;
+              setSelectedProduct(next);
+              // reset selections
+              setSelectedGroup(null);
+              setSelectedModule(null);
+              setSelectedMenuItem(null);
+            }}
+          >
+            <SelectTrigger className="w-[260px]">
+              <SelectValue placeholder="Pilih produk" />
+            </SelectTrigger>
+            <SelectContent>
+              {products.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="truncate">{p.name}</span>
+                    <Badge variant="outline" className="text-2xs">
+                      {p.product_code}
+                    </Badge>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          onClick={() => setShowTrash(true)}
-          className="flex items-center gap-2"
-        >
+        {/* Sampah */}
+        <Button variant="outline" onClick={() => setShowTrash(true)} className="flex items-center gap-2">
           <Trash2 className="h-4 w-4" />
           Sampah
           {trashCount > 0 && (
@@ -635,13 +570,8 @@ export function MenuManagement() {
           )}
         </Button>
 
-        {/* Tombol Generate (tanpa ubah UI lainnya) */}
-        <Button
-          variant="outline"
-          onClick={handleGenerate}
-          className="flex items-center gap-2 bg-transparent"
-          disabled={generating}
-        >
+        {/* Generate */}
+        <Button variant="outline" onClick={handleGenerate} className="flex items-center gap-2 bg-transparent" disabled={generating}>
           <Zap className="h-4 w-4" />
           {generating ? "Generating..." : "Generate"}
         </Button>
@@ -668,6 +598,8 @@ export function MenuManagement() {
                     setSelectedGroup(null);
                     setShowGroupForm(true);
                   }}
+                  disabled={!selectedProduct}
+                  title={!selectedProduct ? "Pilih produk dulu" : ""}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -677,9 +609,7 @@ export function MenuManagement() {
                   <div
                     key={group.id}
                     className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedGroup?.id === group.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/50"
+                      selectedGroup?.id === group.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                     }`}
                     onClick={() => {
                       setSelectedGroup(group);
@@ -689,43 +619,27 @@ export function MenuManagement() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: group.color }}
-                        />
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color }} />
                         {group.icon ? (
                           <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-muted/60">
                             {renderIcon(group.icon)}
                           </span>
                         ) : (
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: group.color }}
-                          />
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color }} />
                         )}
-                        <span className="font-medium text-sm">
-                          {group.name}
-                        </span>
+                        <span className="font-medium text-sm">{group.name}</span>
+                        {group.product_code && (
+                          <Badge variant="outline" className="text-2xs">{group.product_code}</Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Badge variant="secondary" className="text-xs">
                           {group.modules.length}
                         </Badge>
-                        {group.is_active ? (
-                          <Eye className="h-3 w-3 text-green-500" />
-                        ) : (
-                          <EyeOff className="h-3 w-3 text-gray-400" />
-                        )}
+                        {group.is_active ? <Eye className="h-3 w-3 text-green-500" /> : <EyeOff className="h-3 w-3 text-gray-400" />}
                         <DropdownMenu>
-                          <DropdownMenuTrigger
-                            asChild
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0"
-                            >
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                               <MoreHorizontal className="h-3 w-3" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -744,11 +658,7 @@ export function MenuManagement() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setDeleteDialog({
-                                  open: true,
-                                  type: "group",
-                                  item: group,
-                                });
+                                setDeleteDialog({ open: true, type: "group", item: group });
                               }}
                               className="text-destructive"
                             >
@@ -759,9 +669,7 @@ export function MenuManagement() {
                         </DropdownMenu>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {group.description}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{group.description}</p>
                   </div>
                 ))}
               </CardContent>
@@ -773,11 +681,7 @@ export function MenuManagement() {
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Modul
-                  {selectedGroup && (
-                    <Badge variant="outline" className="text-xs">
-                      {selectedGroup.name}
-                    </Badge>
-                  )}
+                  {selectedGroup && <Badge variant="outline" className="text-xs">{selectedGroup.name}</Badge>}
                 </CardTitle>
                 <Button
                   size="sm"
@@ -796,9 +700,7 @@ export function MenuManagement() {
                     <div
                       key={module.id}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedModule?.id === module.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:bg-muted/50"
+                        selectedModule?.id === module.id ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
                       }`}
                       onClick={() => {
                         setSelectedModule(module);
@@ -809,27 +711,14 @@ export function MenuManagement() {
                         <span className="font-medium text-sm flex items-center gap-2">
                           {module.icon && renderIcon(module.icon)}
                           {module.name}
+                          {module.product_code && <Badge variant="outline" className="text-2xs">{module.product_code}</Badge>}
                         </span>
-
                         <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className="text-xs">
-                            {module.menus.length}
-                          </Badge>
-                          {module.is_active ? (
-                            <Eye className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <EyeOff className="h-3 w-3 text-gray-400" />
-                          )}
+                          <Badge variant="secondary" className="text-xs">{module.menus.length}</Badge>
+                          {module.is_active ? <Eye className="h-3 w-3 text-green-500" /> : <EyeOff className="h-3 w-3 text-gray-400" />}
                           <DropdownMenu>
-                            <DropdownMenuTrigger
-                              asChild
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                              >
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
                                 <MoreHorizontal className="h-3 w-3" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -848,11 +737,7 @@ export function MenuManagement() {
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setDeleteDialog({
-                                    open: true,
-                                    type: "module",
-                                    item: module,
-                                  });
+                                  setDeleteDialog({ open: true, type: "module", item: module });
                                 }}
                                 className="text-destructive"
                               >
@@ -863,17 +748,13 @@ export function MenuManagement() {
                           </DropdownMenu>
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {module.description}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{module.description}</p>
                     </div>
                   ))
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">
-                      Pilih kelompok modul terlebih dahulu
-                    </p>
+                    <p className="text-sm">Pilih kelompok modul terlebih dahulu</p>
                   </div>
                 )}
               </CardContent>
@@ -885,11 +766,7 @@ export function MenuManagement() {
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <MenuIcon className="h-4 w-4" />
                   Menu
-                  {selectedModule && (
-                    <Badge variant="outline" className="text-xs">
-                      {selectedModule.name}
-                    </Badge>
-                  )}
+                  {selectedModule && <Badge variant="outline" className="text-xs">{selectedModule.name}</Badge>}
                 </CardTitle>
                 <Button
                   size="sm"
@@ -977,7 +854,6 @@ export function MenuManagement() {
       {/* Trash Modal */}
       {showTrash && (
         <MenuTrash
-          // KIRIM dari state TRASH baru
           deletedGroups={trashedGroups}
           deletedModules={trashedModules}
           deletedMenus={trashedMenus}
@@ -987,26 +863,17 @@ export function MenuManagement() {
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog
-        open={deleteDialog.open}
-        onOpenChange={(open) => setDeleteDialog((prev) => ({ ...prev, open }))}
-      >
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog((prev) => ({ ...prev, open }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Konfirmasi Hapus</AlertDialogTitle>
             <AlertDialogDescription>
               Apakah Anda yakin ingin menghapus{" "}
-              {deleteDialog.type === "group"
-                ? "kelompok modul"
-                : deleteDialog.type === "module"
-                ? "modul"
-                : "menu"}{" "}
+              {deleteDialog.type === "group" ? "kelompok modul" : deleteDialog.type === "module" ? "modul" : "menu"}{" "}
               "{deleteDialog.item?.name || deleteDialog.item?.title}"?
-              {deleteDialog.type === "group" &&
-                " Semua modul dan menu di dalamnya akan ikut terhapus."}
-              {deleteDialog.type === "module" &&
-                " Semua menu di dalamnya akan ikut terhapus."}
+              {deleteDialog.type === "group" && " Semua modul dan menu di dalamnya akan ikut terhapus."}
+              {deleteDialog.type === "module" && " Semua menu di dalamnya akan ikut terhapus."}
               <br />
               <strong>Tindakan ini tidak dapat dibatalkan.</strong>
             </AlertDialogDescription>

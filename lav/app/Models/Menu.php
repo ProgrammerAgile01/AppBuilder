@@ -13,6 +13,9 @@ class Menu extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'product_id',
+        'product_code',
+
         'parent_id',
         'level',
         'type',              // 'group' | 'module' | 'menu'
@@ -21,7 +24,6 @@ class Menu extends Model
         'color',
         'order_number',
         'crud_builder_id',
-        // 'builder_table_name', // legacy (opsional)
         'route_path',
         'is_active',
         'note',
@@ -33,6 +35,7 @@ class Menu extends Model
         'level' => 'integer',
         'order_number' => 'integer',
         'color' => 'string',
+         'product_code' => 'string',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -45,6 +48,11 @@ class Menu extends Model
     protected $appends = ['is_deleted'];
 
     // ========== Relations ==========
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'product_id')->withTrashed();
+    }
+
     public function parent(): BelongsTo
     {
         return $this->belongsTo(Menu::class, 'parent_id')->withTrashed();
@@ -55,9 +63,6 @@ class Menu extends Model
         return $this->hasMany(Menu::class, 'parent_id')->orderBy('order_number');
     }
 
-    /**
-     * Rekursif: anak-cucu + ikut soft-deleted
-     */
     public function recursiveChildren(): HasMany
     {
         return $this->hasMany(Menu::class, 'parent_id')
@@ -80,41 +85,29 @@ class Menu extends Model
         return $this->belongsTo(CrudBuilder::class)->withTrashed();
     }
 
+    public function builderFeatures(): HasMany
+    {
+        return $this->hasMany(\App\Models\BuilderPackage::class, 'menu_id');
+    }
+
+    public function builderFeaturesRoot(): HasMany
+    {
+        return $this->builderFeatures()->whereNull('parent_id');
+    }
+
+    public function featureBuilders()
+    {
+        return $this->hasMany(FeatureBuilder::class);
+    }
+
     // ========== Scopes ==========
-    public function scopeActive($q)
-    {
-        return $q->where('is_active', true);
-    }
-
-    public function scopeByType($q, $type)
-    {
-        return $q->where('type', $type);
-    }
-
-    public function scopeGroup($q)
-    {
-        return $q->where('type', 'group');
-    }
-
-    public function scopeModule($q)
-    {
-        return $q->where('type', 'module');
-    }
-
-    public function scopeMenu($q)
-    {
-        return $q->where('type', 'menu');
-    }
-
-    public function scopeRoot($q)
-    {
-        return $q->whereNull('parent_id');
-    }
-
-    public function scopeOrdered($q)
-    {
-        return $q->orderBy('order_number');
-    }
+    public function scopeActive($q)    { return $q->where('is_active', true); }
+    public function scopeByType($q,$t) { return $q->where('type', $t); }
+    public function scopeGroup($q)     { return $q->where('type', 'group'); }
+    public function scopeModule($q)    { return $q->where('type', 'module'); }
+    public function scopeMenu($q)      { return $q->where('type', 'menu'); }
+    public function scopeRoot($q)      { return $q->whereNull('parent_id'); }
+    public function scopeOrdered($q)   { return $q->orderBy('order_number'); }
 
     // ========== Accessors ==========
     public function getIsDeletedAttribute(): bool
@@ -123,10 +116,7 @@ class Menu extends Model
     }
 
     // ========== Helpers ==========
-    public function hasChildren(): bool
-    {
-        return $this->children()->exists();
-    }
+    public function hasChildren(): bool { return $this->children()->exists(); }
 
     public function getDescendantIds(): array
     {
@@ -142,6 +132,9 @@ class Menu extends Model
     {
         return [
             'id' => $this->id,
+            'product_id' => $this->product_id,
+            'product_code' => $this->product_code,
+
             'parent_id' => $this->parent_id,
             'level' => $this->level,
             'type' => $this->type,
@@ -163,40 +156,45 @@ class Menu extends Model
         ];
     }
 
-    // ========== Model Events (integritas data) ==========
     protected static function booted()
     {
-        // Auto-level dan order_number saat create
+        // level + order_number
         static::creating(function (Menu $menu) {
-            // level
             if (is_null($menu->level)) {
                 $level = 1;
                 if (!empty($menu->parent_id)) {
                     $parent = Menu::withTrashed()->find($menu->parent_id);
                     $level = ($parent->level ?? 0) + 1;
+
+                    // wariskan product jika belum diisi
+                    if (empty($menu->product_id)) {
+                        $menu->product_id = $parent->product_id;
+                        $menu->product_code = $parent->product_code;
+                    }
                 }
                 $menu->level = $level;
             }
-            // order
             if (is_null($menu->order_number)) {
                 $max = Menu::withTrashed()
                     ->where('parent_id', $menu->parent_id ?? null)
                     ->max('order_number') ?? 0;
                 $menu->order_number = $max + 1;
             }
-            // default aktif
-            if (is_null($menu->is_active)) {
-                $menu->is_active = true;
-            }
+            if (is_null($menu->is_active)) $menu->is_active = true;
         });
 
-        // Jika parent pindah, update level & beri order bila kosong
         static::updating(function (Menu $menu) {
             if ($menu->isDirty('parent_id')) {
                 $level = 1;
                 if (!empty($menu->parent_id)) {
                     $parent = Menu::withTrashed()->find($menu->parent_id);
                     $level = ($parent->level ?? 0) + 1;
+
+                    // jika ganti parent, ikutkan product dari parent bila belum eksplisit
+                    if (empty($menu->product_id)) {
+                        $menu->product_id = $parent->product_id;
+                        $menu->product_code = $parent->product_code;
+                    }
                 }
                 $menu->level = $level;
 
@@ -209,27 +207,17 @@ class Menu extends Model
             }
         });
 
-        // Cascade soft delete ke anak
+        // cascade soft delete / restore / force delete tetap sama
         static::deleting(function (Menu $menu) {
             if (!$menu->isForceDeleting()) {
-                $menu->children()->withTrashed()->get()->each(function (Menu $child) {
-                    $child->delete();
-                });
+                $menu->children()->withTrashed()->get()->each(fn (Menu $c) => $c->delete());
             }
         });
-
-        // Cascade restore ke anak
         static::restoring(function (Menu $menu) {
-            $menu->children()->withTrashed()->get()->each(function (Menu $child) {
-                $child->restore();
-            });
+            $menu->children()->withTrashed()->get()->each(fn (Menu $c) => $c->restore());
         });
-
-        // Cascade hard delete ke anak
         static::forceDeleted(function (Menu $menu) {
-            $menu->children()->withTrashed()->get()->each(function (Menu $child) {
-                $child->forceDelete();
-            });
+            $menu->children()->withTrashed()->get()->each(fn (Menu $c) => $c->forceDelete());
         });
     }
 }

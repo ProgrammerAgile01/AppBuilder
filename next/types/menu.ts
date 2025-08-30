@@ -105,9 +105,7 @@ export interface BackendMenu {
   icon: string | null;
   color?: string | null;
   order_number: number | null;
-  // Pindah ke field id builder, bukan table name:
   crud_builder_id?: number | string | null;
-  // Legacy (kalau masih ada di response lama):
   builder_table_name?: string | null;
   route_path: string | null;
   is_active: boolean;
@@ -117,18 +115,20 @@ export interface BackendMenu {
   created_at: string;
   updated_at: string;
 
-  // Hasil with('recursiveChildren') default snake_case:
+  // NEW: per-product
+  product_id?: string | null;
+  product_code?: string | number | null;
+
+  // Recursive children (nama bisa snake/camel tergantung backend)
   recursive_children?: BackendMenu[];
-  // Kadang ada tim yang menamai camelCase:
   recursiveChildren?: BackendMenu[];
 }
 
-// Kalau kamu punya endpoint CRUD builders:
 export interface BackendCrudBuilder {
   id: number | string;
   name: string;
-  menu_title: string; // atau menuTitle (ditangani saat normalisasi di api.ts)
-  table_name: string; // atau tableName (ditangani saat normalisasi di api.ts)
+  menu_title: string;
+  table_name: string;
 }
 
 // =====================
@@ -147,6 +147,10 @@ export interface ModuleGroup {
   modules: Module[];
   created_at: string;
   updated_at: string;
+
+  // per-product (opsional)
+  product_id?: string;
+  product_code?: string | number;
 }
 
 export interface Module {
@@ -162,6 +166,9 @@ export interface Module {
   menus: MenuItem[];
   created_at: string;
   updated_at: string;
+
+  product_id?: string;
+  product_code?: string | number;
 }
 
 export interface MenuItem {
@@ -170,19 +177,21 @@ export interface MenuItem {
   url?: string;
   icon?: string;
   order: number;
-  parent_id?: string; // undefined untuk top-level menu di dalam module
+  parent_id?: string;
   level: number;
-  // FRONTEND menyimpan id builder, bukan table:
   crud_builder_id?: string;
   is_active: boolean;
   is_deleted: boolean;
   deleted_at?: string;
   created_at: string;
   updated_at: string;
+
+  product_id?: string;
+  product_code?: string | number;
 }
 
 export interface CrudBuilderOption {
-  id: string; // string agar Select stabil
+  id: string;
   name: string;
   menu_title: string;
   table_name: string;
@@ -191,6 +200,15 @@ export interface CrudBuilderOption {
 export interface MenuStructure {
   groups: ModuleGroup[];
   crud_builders: CrudBuilderOption[];
+}
+
+// Produk (untuk dropdown)
+export type ProductStatus = "active" | "inactive";
+export interface Product {
+  id: string;                 // UUID pada tabel mst_products
+  name: string;               // product_name
+  product_code: string;       // simpan sebagai string supaya aman (int/char)
+  status: ProductStatus;
 }
 
 // =====================
@@ -202,13 +220,16 @@ export interface CreateMenuRequest {
   type: "group" | "module" | "menu";
   title: string;
   icon?: string | null;
+  color?: string | null;
   order_number?: number | null;
   crud_builder_id?: string | number | null;
   route_path?: string | null;
   is_active?: boolean;
-  is_deleted: boolean;
-  deleted_at?: string;
   note?: string | null;
+
+  // per-product
+  product_id?: string | null;
+  product_code?: string | number | null;
 }
 
 export interface UpdateMenuRequest extends CreateMenuRequest {

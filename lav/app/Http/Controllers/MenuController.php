@@ -13,13 +13,14 @@ use Illuminate\Support\Facades\DB;
 class MenuController extends Controller
 {
     /**
-     * GET /menus?trash=none|with|only
-     * 
+     * GET /menus?trash=none|with|only&product_id=...&product_code=...
      */
     public function index(Request $request): JsonResponse
     {
         try {
             $trash = $request->query('trash', 'none');
+            $productId = $request->query('product_id');
+            $productCode = $request->query('product_code');
 
             $query = Menu::query();
 
@@ -29,39 +30,31 @@ class MenuController extends Controller
                 $query->onlyTrashed();
             }
 
-            // relasi anak: include trashed kalau diminta
+            // filter per product
+            if (!empty($productId)) {
+                $query->where('product_id', $productId);
+            } elseif (!empty($productCode)) {
+                $query->where('product_code', $productCode);
+            }
+
             $withChildren = [
                 'recursiveChildren' => function ($q) use ($trash) {
-                    if ($trash !== 'none')
-                        $q->withTrashed();
-                    // penting: teruskan rekursif-nya juga
+                    if ($trash !== 'none') $q->withTrashed();
                     $q->with([
                         'recursiveChildren' => function ($qq) use ($trash) {
-                        if ($trash !== 'none')
-                            $qq->withTrashed();
-                    }
+                            if ($trash !== 'none') $qq->withTrashed();
+                        }
                     ]);
                 },
                 'crudBuilder' => function ($q) use ($trash) {
-                    if ($trash !== 'none')
-                        $q->withTrashed();
+                    if ($trash !== 'none') $q->withTrashed();
                 },
             ];
 
-            // KUNCI:
-            // - untuk 'none' & 'with' → tetap tree root (parent_id null)
-            // - untuk 'only'         → JANGAN pakai root(), ambil flat semua yang trashed
             if ($trash === 'only') {
-                $menus = $query
-                    ->with($withChildren)
-                    ->ordered()
-                    ->get();                // FLAT LIST trashed (bisa filter di frontend)
+                $menus = $query->with($withChildren)->ordered()->get(); // flat only trashed
             } else {
-                $menus = $query
-                    ->with($withChildren)
-                    ->root()                // hanya root utk tree
-                    ->ordered()
-                    ->get();                // TREE aktif/withTrashed
+                $menus = $query->with($withChildren)->root()->ordered()->get(); // tree
             }
 
             return response()->json(['data' => $menus]);
@@ -74,50 +67,64 @@ class MenuController extends Controller
     }
 
     public function store(Request $request): JsonResponse
-    {
-        try {
-            $data = $request->validate([
-                'parent_id' => 'nullable|exists:menus,id',
-                'type' => ['required', Rule::in(['group', 'module', 'menu'])],
-                'title' => 'required|string|max:255',
-                'icon' => 'nullable|string|max:100',
-                'color' => ['nullable', 'string', 'max:32'],
-                'order_number' => 'nullable|integer|min:1',
-                'crud_builder_id' => 'nullable|exists:crud_builders,id',
-                'route_path' => 'nullable|string|max:255',
-                'is_active' => 'boolean',
-                'note' => 'nullable|string|max:1000',
-            ]);
+{
+    try {
+        $data = $request->validate([
+            'product_id'     => ['required','uuid','exists:mst_products,id'],
+            'product_code'   => ['nullable','string'], // <— INT, bukan string
 
-            // Auto level
-            $level = 1;
-            if (!empty($data['parent_id'])) {
-                $parent = Menu::withTrashed()->find($data['parent_id']);
-                if ($parent)
-                    $level = ($parent->level ?? 0) + 1;
+            'parent_id'      => 'nullable|exists:menus,id',
+            'type'           => ['required', Rule::in(['group','module','menu'])],
+            'title'          => 'required|string|max:255',
+            'icon'           => 'nullable|string|max:100',
+            'color'          => ['nullable','string','max:32'],
+            'order_number'   => 'nullable|integer|min:1',
+            'crud_builder_id'=> 'nullable|exists:crud_builders,id',
+            'route_path'     => 'nullable|string|max:255',
+            'is_active'      => 'boolean',
+            'note'           => 'nullable|string|max:1000',
+        ]);
+
+        // Jika parent ada, wariskan product dari parent
+        $level = 1;
+        if (!empty($data['parent_id'])) {
+            $parent = Menu::withTrashed()->find($data['parent_id']);
+            if ($parent) {
+                $level = ($parent->level ?? 0) + 1;
+                $data['product_id']   = $parent->product_id;
+                $data['product_code'] = $parent->product_code;
             }
-            $data['level'] = $level;
-
-            // Auto order
-            if (!isset($data['order_number'])) {
-                $maxOrder = Menu::withTrashed()
-                    ->where('parent_id', $data['parent_id'] ?? null)
-                    ->max('order_number') ?? 0;
-                $data['order_number'] = $maxOrder + 1;
-            }
-
-            $data['is_active'] = $data['is_active'] ?? true;
-            $data['created_by'] = auth()->id();
-
-            $menu = Menu::create($data)->load('recursiveChildren');
-
-            return response()->json($menu, 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to create menu', 'error' => $e->getMessage()], 500);
         }
+        $data['level'] = $level;
+
+        // Jika TIDAK ada parent dan product_code belum dikirim, ambil dari tabel produk
+        if (empty($data['parent_id']) && !array_key_exists('product_code',$data)) {
+            $prod = \App\Models\Product::withTrashed()->find($data['product_id']);
+            if ($prod && isset($prod->product_code)) {
+                $data['product_code'] = (int) $prod->product_code;
+            }
+        }
+
+        if (!isset($data['order_number'])) {
+            $max = Menu::withTrashed()->where('parent_id', $data['parent_id'] ?? null)->max('order_number') ?? 0;
+            $data['order_number'] = $max + 1;
+        }
+
+        $data['is_active'] = $data['is_active'] ?? true;
+        $data['created_by'] = auth()->id();
+
+        $menu = Menu::create($data)->load('recursiveChildren');
+        return response()->json($menu, 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Failed to create menu',
+            'error'   => $e->getMessage(),
+        ], 500);
     }
+}
+
 
     public function show(string $id, Request $request): JsonResponse
     {
@@ -136,69 +143,69 @@ class MenuController extends Controller
         }
     }
 
-    public function update(Request $request, string $id): JsonResponse
-    {
-        try {
-            $menu = Menu::withTrashed()->findOrFail($id);
+    
+public function update(Request $request, string $id): JsonResponse
+{
+    try {
+        $menu = Menu::withTrashed()->findOrFail($id);
+        if ($menu->trashed()) {
+            return response()->json(['message' => 'Cannot update a trashed menu. Restore first.'], 409);
+        }
 
-            if ($menu->trashed()) {
-                return response()->json(['message' => 'Cannot update a trashed menu. Restore first.'], 409);
+        $data = $request->validate([
+            'product_id'     => ['nullable','uuid','exists:mst_products,id'],
+            'product_code'   => ['nullable','string'], // <— INT
+
+            'parent_id'      => 'nullable|exists:menus,id',
+            'type'           => ['required', Rule::in(['group','module','menu'])],
+            'title'          => 'required|string|max:255',
+            'icon'           => 'nullable|string|max:100',
+            'color'          => ['nullable','string','max:32'],
+            'order_number'   => 'nullable|integer|min:1',
+            'crud_builder_id'=> 'nullable|exists:crud_builders,id',
+            'route_path'     => 'nullable|string|max:255',
+            'is_active'      => 'boolean',
+            'note'           => 'nullable|string|max:1000',
+        ]);
+
+        // konsistensi product dengan parent (jika ada)
+        $parentId = array_key_exists('parent_id', $data) ? $data['parent_id'] : $menu->parent_id;
+        if (!empty($parentId)) {
+            $parent = Menu::withTrashed()->find($parentId);
+            if ($parent) {
+                $data['product_id']   = $parent->product_id;
+                $data['product_code'] = $parent->product_code;
             }
-
-            $data = $request->validate([
-                'parent_id' => 'nullable|exists:menus,id',
-                'type' => ['required', Rule::in(['group', 'module', 'menu'])],
-                'title' => 'required|string|max:255',
-                'icon' => 'nullable|string|max:100',
-                'color' => ['nullable', 'string', 'max:32'],
-                'order_number' => 'nullable|integer|min:1',
-                'crud_builder_id' => 'nullable|exists:crud_builders,id',
-                'route_path' => 'nullable|string|max:255',
-                'is_active' => 'boolean',
-                'note' => 'nullable|string|max:1000',
-            ]);
-
-            if (isset($data['parent_id']) && (string) $data['parent_id'] === (string) $id) {
-                return response()->json(['message' => 'Menu cannot be its own parent'], 422);
+        } elseif (isset($data['product_id']) && !array_key_exists('product_code',$data)) {
+            $prod = \App\Models\Product::withTrashed()->find($data['product_id']);
+            if ($prod && isset($prod->product_code)) {
+                $data['product_code'] = (int) $prod->product_code;
             }
+        }
 
-            if (!empty($data['parent_id']) && $this->wouldCreateCircularReference($id, $data['parent_id'])) {
-                return response()->json(['message' => 'This would create a circular reference'], 422);
-            }
+        // level + order
+        $level = 1;
+        if (!empty($parentId)) {
+            $parent = Menu::withTrashed()->find($parentId);
+            if ($parent) $level = ($parent->level ?? 0) + 1;
+        }
+        $data['level'] = $level;
 
-            // Auto level
-            $parentId = array_key_exists('parent_id', $data) ? $data['parent_id'] : $menu->parent_id;
-            $level = 1;
-            if (!empty($parentId)) {
-                $parent = Menu::withTrashed()->find($parentId);
-                if ($parent)
-                    $level = ($parent->level ?? 0) + 1;
-            }
-            $data['level'] = $level;
+        if (!isset($data['order_number'])) {
+            $max = Menu::withTrashed()->where('parent_id', $parentId)->max('order_number') ?? 0;
+            $data['order_number'] = max($menu->order_number ?? 1, $max);
+        }
 
-            // Auto order (optional)
-            if (!isset($data['order_number'])) {
-                $maxOrder = Menu::withTrashed()->where('parent_id', $parentId)->max('order_number') ?? 0;
-                $data['order_number'] = max($menu->order_number ?? 1, $maxOrder);
-            }
-
-            $menu->update($data);
-            $menu->load('recursiveChildren');
-
-            return response()->json($menu);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json(['message' => 'Menu not found'], 404);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to update menu', 'error' => $e->getMessage()], 500);
+        $menu->update($data);
+        return response()->json($menu->fresh('recursiveChildren'));
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'Failed to update menu', 'error' => $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Soft delete (+cascade anak via model)
-     */
-    public function destroy(string $id): JsonResponse
+        public function destroy(string $id): JsonResponse
     {
         try {
             $menu = Menu::findOrFail($id);
@@ -212,23 +219,16 @@ class MenuController extends Controller
         }
     }
 
-    /**
-     * Restore soft-deleted item (+anak ikut restore via model)
-     */
     public function restore(string $id): JsonResponse
     {
         try {
-            // Cari menu, termasuk yang sudah dihapus
             $menu = Menu::withTrashed()->findOrFail($id);
 
-            // Periksa apakah menu ini benar-benar soft-deleted
             if (!$menu->trashed()) {
                 return response()->json(['message' => 'Menu tidak terhapus dan tidak bisa dipulihkan.'], 409);
             }
 
-            // Jika terhapus, jalankan proses restore
             $menu->restore();
-
             return response()->json(['message' => 'Menu berhasil dipulihkan']);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json(['message' => 'Menu tidak ditemukan'], 404);
@@ -236,9 +236,7 @@ class MenuController extends Controller
             return response()->json(['message' => 'Gagal memulihkan menu', 'error' => $e->getMessage()], 500);
         }
     }
-    /**
-     * Hard delete permanen (+cascade DB untuk FK)
-     */
+
     public function forceDelete(string $id): JsonResponse
     {
         try {
@@ -301,41 +299,41 @@ class MenuController extends Controller
     {
         $parent = Menu::withTrashed()->find($parentId);
         while ($parent) {
-            if ((string) $parent->id === (string) $menuId)
-                return true;
+            if ((string) $parent->id === (string) $menuId) return true;
             $parent = $parent->parent;
         }
         return false;
     }
 
     /**
-     * === SATU FUNGSI GENERATOR ===
-     * Baca DB → bentuk menuItems → render TS → sisip ke stub → tulis ke file output.
+     * Generator + filter per product
+     * POST /generate-menu?product_id=...&group_id=...&module_id=...
      */
     public function generateMenu(Request $request): JsonResponse
     {
         try {
-            $groupId = $request->query('group_id');
-            $moduleId = $request->query('module_id');
+            $groupId   = $request->query('group_id');
+            $moduleId  = $request->query('module_id');
+            $productId = $request->query('product_id'); // BARU
 
             $groupsQ = Menu::query()
                 ->whereNull('parent_id')
                 ->where('type', 'group')
+                ->when($productId, fn($q) => $q->where('product_id', $productId)) // filter product
                 ->with([
                     'recursiveChildren' => function ($q) {
                         $q->orderBy('order_number')
-                            ->with([
-                                'recursiveChildren' => function ($qq) {
-                                    $qq->orderBy('order_number')
-                                        ->with(['recursiveChildren']);
-                                }
-                            ]);
+                          ->with([
+                              'recursiveChildren' => function ($qq) {
+                                  $qq->orderBy('order_number')
+                                     ->with(['recursiveChildren']);
+                              }
+                          ]);
                     }
                 ])
                 ->orderBy('order_number');
 
-            if ($groupId)
-                $groupsQ->where('id', $groupId);
+            if ($groupId)  $groupsQ->where('id', $groupId);
             $groups = $groupsQ->get();
 
             $usedIconSet = [];
@@ -348,36 +346,26 @@ class MenuController extends Controller
                     ->values();
 
                 foreach ($modules as $m) {
-                    if ($moduleId && (string) $m->id !== (string) $moduleId)
-                        continue;
+                    if ($moduleId && (string) $m->id !== (string) $moduleId) continue;
 
-                    // semua node menu di bawah module
+                    // kumpulkan semua "menu" di bawah module
                     $allMenus = $this->collectMenusDepth($m);
 
-                    // top menu langsung di bawah module
+                    // top menu
                     $topMenus = $allMenus->filter(fn($n) => (string) $n->parent_id === (string) $m->id)
-                        ->sortBy('order_number')
-                        ->values();
+                                         ->sortBy('order_number')
+                                         ->values();
 
                     $itemsTs = [];
                     $nestedItemsTs = [];
+                    $seen = ['href' => [], 'title' => []];
 
-                    // set untuk dedupe items
-                    $seen = [
-                        'href' => [],
-                        'title' => [],
-                    ];
                     $pushItem = function (string $icon, string $labelKey, string $href) use (&$itemsTs, &$seen) {
                         $hk = trim($href) !== '' ? strtolower($href) : '';
                         $tk = strtolower($labelKey);
-                        if (($hk && isset($seen['href'][$hk])) || isset($seen['title'][$tk])) {
-                            return; // sudah ada
-                        }
-                        if ($hk)
-                            $seen['href'][$hk] = true;
+                        if (($hk && isset($seen['href'][$hk])) || isset($seen['title'][$tk])) return;
+                        if ($hk) $seen['href'][$hk] = true;
                         $seen['title'][$tk] = true;
-
-                        // CAST labelKey -> any agar lolos tipe TranslationKey tanpa ubah i18n
                         $itemsTs[] = '{ icon: ' . $icon . ', labelKey: "' . addslashes($labelKey) . '" as any, href: "' . addslashes($href) . '" }';
                     };
 
@@ -386,43 +374,29 @@ class MenuController extends Controller
                         $usedIconSet[$topIcon] = true;
 
                         $children = $allMenus->filter(fn($n) => (string) $n->parent_id === (string) $top->id)
-                            ->sortBy('order_number')
-                            ->values();
+                                             ->sortBy('order_number')
+                                             ->values();
 
                         if ($children->isEmpty()) {
-                            // LEAF → items
                             $pushItem($topIcon, $this->labelKeyFromTitle($top->title), $top->route_path ?: '#');
                         } else {
-                            // Punya anak:
-                            // 1) nestedItems (untuk collapsible)
                             $subTs = [];
                             foreach ($children as $ch) {
                                 $chIcon = $this->normalizeLucideIcon($ch->icon ?: 'FileText');
                                 $usedIconSet[$chIcon] = true;
 
-                                $subTs[] =
-                                    '{ icon: ' . $chIcon .
-                                    ', label: "' . addslashes($ch->title) . '"' .
-                                    ', href: "' . addslashes($ch->route_path ?: "#") . '" }';
-
-                                // 2) flatten anak ke items (REGULAR view) dgn dedupe
+                                $subTs[] = '{ icon: '.$chIcon.', label: "'.addslashes($ch->title).'", href: "'.addslashes($ch->route_path ?: "#").'" }';
                                 $pushItem($chIcon, $this->labelKeyFromTitle($ch->title), $ch->route_path ?: '#');
                             }
 
-                            $nestedItemsTs[] =
-                                '{ id: "nid_' . addslashes((string) $top->id) . '"' .
-                                ', icon: ' . $topIcon .
-                                ', label: "' . addslashes($top->title) . '"' .
-                                ', items: [' . implode(',', $subTs) . '] }';
+                            $nestedItemsTs[] = '{ id: "nid_'.addslashes((string)$top->id).'", icon: '.$topIcon.', label: "'.addslashes($top->title).'", items: ['.implode(',', $subTs).'] }';
 
-                            // 3) Tampilkan juga PARENT sebagai item kalau punya route (biar "Tipe Kendaraan" muncul)
                             if (!empty($top->route_path)) {
                                 $pushItem($topIcon, $this->labelKeyFromTitle($top->title), $top->route_path);
                             }
                         }
                     }
 
-                    // Data module
                     $modIcon = $this->normalizeLucideIcon($m->icon ?: 'Package');
                     $usedIconSet[$modIcon] = true;
 
@@ -430,7 +404,6 @@ class MenuController extends Controller
                     $moduleLabelKey = $this->labelKeyFromTitle($m->title);
                     $moduleDesc = (string) ($m->note ?? '');
 
-                    // metadata group ringan
                     $groupColor = $g->color ?: '#3b82f6';
                     $iconBgClass = 'bg-primary/15';
                     $iconColor = 'text-primary';
@@ -438,7 +411,6 @@ class MenuController extends Controller
                     $borderColor = 'border-border';
                     $hoverBorder = 'hover:border-primary/30';
 
-                    // CAST labelKey module -> any juga
                     $moduleParts = [
                         'id: "' . addslashes($moduleIdStr) . '"',
                         'icon: ' . $modIcon,
@@ -466,7 +438,6 @@ class MenuController extends Controller
 
             $menuItemsLiteral = '[' . implode(',', $modulesTs) . ']';
 
-            // ====== STUB ======
             [$stubPath, $template] = $this->resolveStubOrFail();
             if (strpos($template, '/*__MENU_ITEMS__*/') === false) {
                 return response()->json([
@@ -475,13 +446,9 @@ class MenuController extends Controller
                 ], 500);
             }
 
-            // sisipkan literal + titik koma
             $template = str_replace('/*__MENU_ITEMS__*/', $menuItemsLiteral . ';', $template);
-
-            // inject import ikon yang kurang
             $template = $this->injectMissingIconsIntoImport($template, array_keys($usedIconSet));
 
-            // ====== OUTPUT BENAR ======
             $outDir = base_path('../appgenerate/next-gen/components');
             $outFile = $outDir . DIRECTORY_SEPARATOR . 'app-sidebar.tsx';
             \Illuminate\Support\Facades\File::ensureDirectoryExists($outDir);
@@ -502,16 +469,12 @@ class MenuController extends Controller
         }
     }
 
-    /**
-     * Kumpulkan semua node type=menu di bawah module (rekursif).
-     */
     private function collectMenusDepth($module)
     {
         $result = collect();
         $stack = [$module];
 
         while (!empty($stack)) {
-            /** @var \App\Models\Menu $node */
             $node = array_pop($stack);
 
             $children = collect($node->recursiveChildren ?? [])
@@ -520,10 +483,7 @@ class MenuController extends Controller
                 ->values();
 
             foreach ($children as $ch) {
-                if ($ch->type === 'menu') {
-                    $result->push($ch);
-                }
-                // dorong terus agar tetap rekursif
+                if ($ch->type === 'menu') $result->push($ch);
                 $stack[] = $ch;
             }
         }
@@ -531,16 +491,10 @@ class MenuController extends Controller
         return $result;
     }
 
-    /**
-     * Cari stub di beberapa lokasi umum. Gagal -> error jelas.
-     */
     private function resolveStubOrFail(): array
     {
         $candidates = [
             base_path('stubs/frontend/app-sidebar.stub'),
-            // base_path('appbuilder/appgenerate/next-gen/stubs/app-sidebar.stub'),
-            // resource_path('stubs/app-sidebar.stub'),
-            // resource_path('stubs/next-gen/app-sidebar.stub'),
         ];
 
         foreach ($candidates as $path) {
@@ -549,52 +503,36 @@ class MenuController extends Controller
             }
         }
 
-        throw new \RuntimeException(
-            "Stub file not found. Checked paths:\n- " . implode("\n- ", $candidates)
-        );
+        throw new \RuntimeException("Stub file not found. Checked paths:\n- " . implode("\n- ", $candidates));
     }
 
-    /**
-     * Normalisasi nama ikon Lucide → PascalCase (+ alias umum).
-     */
     private function normalizeLucideIcon(?string $name): string
     {
         $n = trim((string) $name);
-        if ($n === '')
-            return 'Folder';
+        if ($n === '') return 'Folder';
         $n = preg_replace('/\s+/', '', $n);
         $n = preg_replace_callback('/[-_](.)/', fn($m) => strtoupper($m[1] ?? ''), $n);
         $n = ucfirst($n);
         static $map = [
-        'Filetext' => 'FileText',
-        'Arrowrightleft' => 'ArrowRightLeft',
-        'Rotateccw' => 'RotateCcw',
-        'Creditcard' => 'CreditCard',
-        'Barchart3' => 'BarChart3',
-        'Usercheck' => 'UserCheck',
-        'Dollarsign' => 'DollarSign',
-        'Piechart' => 'PieChart',
+            'Filetext' => 'FileText',
+            'Arrowrightleft' => 'ArrowRightLeft',
+            'Rotateccw' => 'RotateCcw',
+            'Creditcard' => 'CreditCard',
+            'Barchart3' => 'BarChart3',
+            'Usercheck' => 'UserCheck',
+            'Dollarsign' => 'DollarSign',
+            'Piechart' => 'PieChart',
         ];
         return $map[$n] ?? $n;
     }
 
-    /**
-     * Buat key i18n dari title → camelCase.
-     */
     private function labelKeyFromTitle(string $title): string
     {
-        // Hilangkan karakter tidak perlu → jadi slug pakai spasi
         $slug = \Illuminate\Support\Str::slug($title, ' ');
-
-        // Ubah ke lowercase dulu lalu kapitalisasi tiap kata
         $label = ucwords(strtolower($slug));
-
         return $label;
     }
 
-    /**
-     * Inject ikon yang belum ada ke import lucide-react pertama.
-     */
     private function injectMissingIconsIntoImport(string $template, array $needed): string
     {
         return preg_replace_callback(
@@ -603,31 +541,26 @@ class MenuController extends Controller
                 $inside = $m[1];
                 $parts = array_filter(array_map('trim', explode(',', $inside)));
                 $existing = [];
-
                 foreach ($parts as $p) {
                     $tok = preg_split('/\s+as\s+/i', $p);
                     $base = trim($tok[0]);
-                    if ($base !== '')
-                        $existing[$base] = true;
+                    if ($base !== '') $existing[$base] = true;
                     if (isset($tok[1])) {
                         $alias = trim($tok[1]);
-                        if ($alias !== '')
-                            $existing[$alias] = true;
+                        if ($alias !== '') $existing[$alias] = true;
                     }
                 }
-
                 foreach ($needed as $icon) {
                     if (!isset($existing[$icon])) {
                         $parts[] = $icon;
                         $existing[$icon] = true;
                     }
                 }
-
                 $newInside = implode(', ', $parts);
                 return 'import { ' . $newInside . ' } from "lucide-react";';
             },
             $template,
-            1 // hanya import lucide pertama
+            1
         );
     }
 }

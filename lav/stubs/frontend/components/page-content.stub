@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Car, Circle, Edit, Eye, Fuel, MapPin, Plus, Trash2, Users, Download, Sparkles, Upload, FileSpreadsheet } from "lucide-react";
+import { Car, Circle, Edit, Eye, Fuel, MapPin, Plus, Trash2, Users, Download, Sparkles, Upload, FileSpreadsheet, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -295,7 +295,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Table({
   return isMobile ? (
     <div>
       {filtered{{ENTITY_PASCAL_SINGULAR}}.map((item: any) => (
-        <MobileVehicleCard
+        <Mobile{{ENTITY_PASCAL_SINGULAR}}Card
           key={item.id}
           filtered{{ENTITY_PASCAL_SINGULAR}}={item}
           handleDelete={handleDelete}

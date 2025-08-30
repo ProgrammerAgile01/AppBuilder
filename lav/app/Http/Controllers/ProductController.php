@@ -10,7 +10,7 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $q = Product::query();
+        $q = Product::query()->with('templateFrontend');
 
         // trash filter: none (default) | with | only
         $trash = $request->query('trash', 'none');
@@ -47,7 +47,7 @@ class ProductController extends Controller
 
     public function show(string $id)
     {
-        $row = Product::withTrashed()->findOrFail($id);
+        $row = Product::withTrashed()->with('templateFrontend')->findOrFail($id);
 
         return response()->json([
             'success' => true,
@@ -59,6 +59,7 @@ class ProductController extends Controller
     {
         $validated = $request->validate([
             'template_frontend_id' => ['required', 'uuid', 'exists:mst_template_frontend,id'],
+            'db_name' => ['required', 'string', 'max:60', 'regex:/^[a-z0-9_]+$/', 'unique:mst_products,db_name'],
             'product_code' => [
                 'required',
                 'string',
@@ -77,16 +78,17 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product created.',
-            'data' => $row,
+            'data' => $row->load('templateFrontend'),
         ], 201);
     }
 
     public function update(Request $request, string $id)
     {
-        $row = Product::withTrashed()->findOrFail($id);
+        $row = Product::withTrashed()->with('templateFrontend')->findOrFail($id);
 
         $validated = $request->validate([
             'template_frontend_id' => ['required', 'uuid', 'exists:mst_template_frontend,id'],
+            'db_name' => ['required', 'string', 'max:60', 'regex:/^[a-z0-9_]+$/', 'unique:mst_products,db_name'],
             'product_code' => [
                 'required',
                 'string',
@@ -104,7 +106,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product updated.',
-            'data' => $row,
+            'data' => $row->load('templateFrontend'),
         ]);
     }
 
@@ -129,7 +131,7 @@ class ProductController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Product restored.',
-            'data' => $row,
+            'data' => $row->load('templateFrontend'),
         ]);
     }
 

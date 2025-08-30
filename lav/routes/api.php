@@ -56,6 +56,9 @@ Route::delete('template-frontend/{id}/force', [TemplateFrontendController::class
 
 // Atur Fitur
 Route::get('fitur/tree', [FeatureBuilderController::class, 'tree']);
+Route::get('fitur/trash-box', [FeatureBuilderController::class, 'trashBox']);
+Route::post('fitur/generate/{productId}', [FeatureBuilderController::class, 'generate']);
+
 Route::apiResource('fitur', FeatureBuilderController::class);
 Route::post('fitur/{id}/toggle', [FeatureBuilderController::class, 'toggle']);
 Route::post('fitur/{id}/restore', [FeatureBuilderController::class, 'restore']);

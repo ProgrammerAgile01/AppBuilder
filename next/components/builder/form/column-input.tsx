@@ -95,7 +95,7 @@ const DATA_TYPES = [
 
   // Numeric Types
   {
-    value: "int",
+    value: "integer",
     label: "INT",
     description: "Integer (-2,147,483,648 to 2,147,483,647)",
     category: "Numeric",

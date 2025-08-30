@@ -100,7 +100,7 @@ const navigation = [
   // },
   {
     title: "Atur Fitur",
-    href: "/admin/feature-builder",
+    href: "/admin/atur-fitur",
     icon: Settings,
     badge: "New",
   },
