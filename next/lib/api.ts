@@ -310,6 +310,28 @@ export async function fetchOptions(entity: string) {
     label: item.name || item.menu_title || item.label || item.value,
   }));
 }
+export async function fetchProductsOnBuilder(
+  path: string,
+  params: { status?: string }
+) {
+  const url = new URL(`${API_URL}/${path}`);
+  if (params.status)
+    url.searchParams.set("status", params.status.toLowerCase());
+
+  const res = await fetch(url.toString(), {
+    headers: { Accept: "application/json" },
+  });
+  const json = await res.json();
+
+  const arr: any[] = Array.isArray(json?.data) ? json.data : [];
+
+  return arr.map((item: any) => ({
+    value: String(item.id), // UUID
+    label: String(item.product_name ?? ""), // pakai product_name
+    code: item.product_code ?? null, // opsional, kalau mau dipakai
+    status: item.status ?? null,
+  }));
+}
 export async function generate(entity: string, id: string) {
   const res = await fetch(`${API_URL}/${entity}/generate/${id}`, {
     method: "POST",
@@ -555,6 +577,32 @@ export async function toggleMenuActive(id: string) {
   }
   return res.json().catch(() => ({}));
 }
+function normalizeBuilder(raw: any): CrudBuilderOption | null {
+  if (!raw) return null;
+
+  const id = raw.id ?? raw._id ?? raw.uuid;
+  if (id === undefined || id === null) return null;
+
+  const name = raw.name ?? raw.nama ?? raw.title ?? raw.judul ?? "";
+
+  const menu_title =
+    raw.menu_title ??
+    raw.menuTitle ??
+    raw.title ??
+    raw.judul ??
+    name ?? // fallback ke name
+    "";
+
+  const table_name =
+    raw.table_name ?? raw.tableName ?? raw.table ?? raw.slug ?? raw.route ?? "";
+
+  return {
+    id: String(id),
+    name: String(name || menu_title || table_name || "Untitled"),
+    menu_title: String(menu_title || name || "Untitled"),
+    table_name: String(table_name || "").replace(/^\//, ""), // buang leading slash kalau ada
+  };
+}
 
 /* =========================
    CRUD BUILDERS (dropdown)
@@ -564,8 +612,11 @@ export async function fetchCrudBuilders(
 ): Promise<CrudBuilderOption[]> {
   const res = await fetch(`${API_URL}/builder`, {
     cache: "no-store",
+    // credentials: "include", // kalau pakai auth cookie/JWT di cookie
     signal,
-    headers: { Accept: "application/json" },
+    headers: {
+      Accept: "application/json",
+    },
   });
 
   if (!res.ok) {
@@ -576,19 +627,18 @@ export async function fetchCrudBuilders(
   }
 
   const json = await res.json().catch(() => ({}));
-  const rows = extractArray(json);
+  const items = extractArray(json);
 
-  const mapped: CrudBuilderOption[] = rows
-    .map((r: any) => ({
-      id: String(r.id),
-      name: String(r.name ?? r.menu_title ?? r.table_name ?? "Untitled"),
-      menu_title: String(r.menu_title ?? r.name ?? "Untitled"),
-      table_name: String(r.table_name ?? "").replace(/^\//, ""),
-    }))
-    .filter((x) => x.id && x.menu_title);
+  const mapped = items
+    .map(normalizeBuilder)
+    .filter((x): x is CrudBuilderOption => !!x);
 
+  // de-dupe by id + sort by menu_title
   const uniq = new Map<string, CrudBuilderOption>();
-  for (const m of mapped) if (!uniq.has(m.id)) uniq.set(m.id, m);
+  for (const m of mapped) {
+    if (!uniq.has(m.id)) uniq.set(m.id, m);
+  }
+
   return Array.from(uniq.values()).sort((a, b) =>
     a.menu_title.localeCompare(b.menu_title)
   );

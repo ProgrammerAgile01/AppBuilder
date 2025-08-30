@@ -21,7 +21,7 @@ class CrudBuilderController extends Controller
     public function index()
     {
         try {
-            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
+            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product.template', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
 
             return response()->json([
                 'success' => true,
@@ -243,7 +243,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil membuat builder',
-                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product.template', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -270,7 +270,7 @@ class CrudBuilderController extends Controller
     public function show($id)
     {
         try {
-            $builder = CrudBuilder::withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::withCount('fields')->with(['product.template', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -407,7 +407,7 @@ class CrudBuilderController extends Controller
         DB::beginTransaction();
         try {
             // 2) AMBIL BUILDER
-            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product.template', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             // 3) UPDATE MASTER BUILDER
             $builder->update($request->only([
@@ -531,7 +531,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil memperbarui builder',
-                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product.template', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -573,7 +573,7 @@ class CrudBuilderController extends Controller
 
     public function deletedBuilder()
     {
-        $builder = CrudBuilder::onlyTrashed()->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
+        $builder = CrudBuilder::onlyTrashed()->with(['product.template', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
 
         $totalBuilderDihapus = CrudBuilder::onlyTrashed()->count();
 
@@ -701,7 +701,7 @@ class CrudBuilderController extends Controller
      */
     private function getFrontendSkeletonPath($builder): string
     {
-        $templateCode = $builder->product->templateFrontend->template_code ?? 'DEFAULT';
+        $templateCode = $builder->product->template->template_code ?? 'DEFAULT';
 
         // Prioritas: skeleton khusus per-produk
         $src = base_path("stubs/skeletons/frontend/{$templateCode}");
@@ -860,7 +860,7 @@ class CrudBuilderController extends Controller
     private function writeProductReadme($builder, bool $overwrite = false): void
     {
         $product = $this->productSlug;
-        $templateName = $builder->product->templateFrontend->template_name ?? 'DEFAULT';
+        $templateName = $builder->product->template->template_name ?? 'DEFAULT';
 
         $dest = $this->productPath('README.md');
 
@@ -955,7 +955,7 @@ MD;
     {
         try {
             // load builder dengan relasi
-            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product.template', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
 
             // Set root per product & bootstrap skeleton proyek jika belum ada
             $this->setProjectRoots($builder);
