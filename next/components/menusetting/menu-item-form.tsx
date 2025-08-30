@@ -64,6 +64,18 @@ export function MenuItemForm({
     [crudBuilders, formData.crud_builder_id]
   );
 
+  // Helpers
+  function slugify(input: string): string {
+    if (!input) return "";
+    return input
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, "-");
+  }
+
   /** ============== Effects (hydrate form) ============== */
   useEffect(() => {
     if (menuItem && menuItem.id) {
@@ -113,14 +125,19 @@ export function MenuItemForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menuItem?.id, menuItem?.parent_id]);
 
-  // Auto-judul saat CRUD dipilih (kalau tidak custom title)
+  // Auto-judul & auto-URL saat CRUD dipilih (kalau tidak custom title/url)
   useEffect(() => {
     if (!useCustomTitle && !useCustomUrl && formData.crud_builder_id) {
       const selectedCrud = crudBuilders.find(
         (c) => String(c.id) === formData.crud_builder_id
       );
       if (selectedCrud) {
-        setFormData((prev) => ({ ...prev, title: selectedCrud.menu_title }));
+        const menuTitle = selectedCrud.menu_title || "";
+        setFormData((prev) => ({
+          ...prev,
+          title: menuTitle,
+          url: slugify(menuTitle), // ✅ auto slugify untuk URL
+        }));
       }
     }
   }, [formData.crud_builder_id, crudBuilders, useCustomTitle, useCustomUrl]);
@@ -134,10 +151,15 @@ export function MenuItemForm({
       : undefined;
 
     // URL final
-    let finalUrl = formData.url.trim();
-    if (!useCustomUrl && selectedCrud) {
-      const tn = String(selectedCrud.table_name || "").replace(/^\/+/, "");
-      finalUrl = `/${tn}`;
+    let finalUrl = "";
+    if (useCustomUrl) {
+      // kalau user input manual → slugify juga, dan pastikan ada prefix "/"
+      const raw = formData.url.trim();
+      finalUrl = raw.startsWith("/") ? raw : `/${slugify(raw)}`;
+    } else if (selectedCrud) {
+      // kalau dari CRUD → slugify menu_title / table_name
+      const basis = selectedCrud.menu_title || "";
+      finalUrl = `/${slugify(basis)}`;
     }
 
     // parent_id yang dikirim ke onSave harus string | undefined
@@ -364,7 +386,7 @@ export function MenuItemForm({
                           <div className="flex items-center gap-2">
                             <span>{crud.menu_title}</span>
                             <Badge variant="outline" className="text-xs">
-                              {crud.table_name}
+                              {crud.menu_title}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -374,7 +396,9 @@ export function MenuItemForm({
                   {selectedCrudBuilder && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <LinkIcon className="h-3 w-3" />
-                      <span>URL: /admin/{selectedCrudBuilder.table_name}</span>
+                      <span>
+                        URL: /{slugify(selectedCrudBuilder.menu_title || "")}
+                      </span>
                     </div>
                   )}
                 </div>
