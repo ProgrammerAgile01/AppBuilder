@@ -2,11 +2,10 @@
 
 import React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { {{ENTITY_PASCAL_SINGULAR}}Header, {{ENTITY_PASCAL_SINGULAR}}Filters, {{ENTITY_PASCAL_SINGULAR}}Table, ResultsInfo } from "./{{ENTITY_KEBAB_SINGULAR}}-page-contents";
-import { deleteData, fetchData } from "@/lib/api";
+import { {{ENTITY_PASCAL_SINGULAR}}Header, {{ENTITY_PASCAL_SINGULAR}}Filters, {{ENTITY_PASCAL_SINGULAR}}Table, ResultsInfo, PaginationControls } from "./{{ENTITY_KEBAB_SINGULAR}}-page-contents";
+import { deleteData, fetchPaginatedData } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { AppSidebar } from "../app-sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "../ui/sidebar";
+import { SidebarTrigger } from "../ui/sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,14 +23,24 @@ const ITEMS_PER_PAGE = 10
 
 export function {{ENTITY_PASCAL_SINGULAR}}Page() {
     const router = useRouter();
+    const { toast } = useToast();
+
     const [items, setItems] = useState<Record<string, any>[]>([]);
     // const [stats, setStats] = useState({});
     const [loading, setLoading] = useState(true);
-    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [currentPage, setCurrentPage] = useState(1);
+
+    const [meta, setMeta] = useState<{
+        current_page?: number;
+        per_page?: number;
+        total?: number | null;
+        last_page?: number | null;
+        from?: number | null;
+        to?: number | null;
+    }>({});
 
     const refetch = useCallback(async (signal?: AbortSignal) => {
         setLoading(true);
@@ -41,9 +50,16 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
             //   fetchData("{{ENTITY_PLURAL}}", { signal }),
             //   fetchModuleStats({ signal }),
             // ]);
-            const dataItems = await fetchData("{{ENTITY_PLURAL}}", { signal });
+            const dataItems = await fetchPaginatedData("{{ENTITY_PLURAL}}", {
+                signal,
+                params: {
+                    page: currentPage,
+                    per_page: ITEMS_PER_PAGE,
+                }
+            });
             if (signal?.aborted) return;
-            setItems(dataItems);
+            setItems(dataItems?.data ?? []);
+            setMeta(dataItems?.meta ?? {});
             // setStats(dataStats);
         } catch (err: any) {
             if (err?.name === "AbortError") return;
@@ -55,7 +71,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
         } finally {
             if (!signal?.aborted) setLoading(false);
         }
-    }, [toast]);
+    }, [toast, currentPage]);
 
     // scroll awal (tetap terpisah)
     useEffect(() => {
@@ -91,10 +107,6 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
 
         // })
     }, [items, searchTerm]);
-
-    const totalPages = Math.ceil(filtered{{ENTITY_PASCAL_SINGULAR}}.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedItems = filtered{{ENTITY_PASCAL_SINGULAR}}.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     const handleDelete = async (id: string) => {
         try {
@@ -166,8 +178,37 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
                         <ActionBar entity="{{ENTITY_PLURAL}}" onDone={() => refetch()} />
                     </div>
                     <{{ENTITY_PASCAL_SINGULAR}}Filters searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-                    <ResultsInfo total={filtered{{ENTITY_PASCAL_SINGULAR}}.length} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} />
+                    <ResultsInfo
+                        total={meta?.total ?? filtered{{ENTITY_PASCAL_SINGULAR}}.length}
+                        currentPage={meta?.current_page ?? 1}
+                        itemsPerPage={meta?.per_page ?? ITEMS_PER_PAGE}
+                        from={
+                            meta?.from ??
+                            ((meta?.current_page ?? 1) - 1) *
+                                (meta?.per_page ?? ITEMS_PER_PAGE) +
+                                1
+                        }
+                        to={
+                            meta?.to ??
+                            (meta?.current_page ?? 1) * (meta?.per_page ?? ITEMS_PER_PAGE)
+                        }
+                    />
                     <{{ENTITY_PASCAL_SINGULAR}}Table handleView={handleView} handleDelete={handleDelete} filtered{{ENTITY_PASCAL_SINGULAR}}={filtered{{ENTITY_PASCAL_SINGULAR}}} />
+                    <PaginationControls
+                        currentPage={meta?.current_page ?? 1}
+                        lastPage={
+                            meta?.last_page ??
+                            Math.max(
+                                1,
+                                Math.ceil(
+                                (meta?.total ?? filtered{{ENTITY_PASCAL_SINGULAR}}.length) /
+                                    (meta?.per_page ?? ITEMS_PER_PAGE)
+                                )
+                            )
+                        }
+                        onPageChange={setCurrentPage}
+                        loading={loading}
+                    />
                 </div>
             </div>
         </>

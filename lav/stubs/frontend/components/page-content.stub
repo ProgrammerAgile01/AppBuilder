@@ -248,18 +248,105 @@ export function ResultsInfo({
   total,
   currentPage,
   itemsPerPage,
+  from,
+  to,
 }: {
   total: number;
   currentPage: number;
   itemsPerPage: number;
+  from?: number | null;
+  to?: number | null;
 }) {
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const _from = from ?? (currentPage - 1) * itemsPerPage + 1;
+  const _to = to ?? Math.min(currentPage * itemsPerPage, total ?? 0);
 
   return (
     <div className="flex justify-between items-center">
       <p className="text-sm text-muted-foreground">
-        Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, total)} of {total} {{ENTITY_HEADLINE_SINGULAR}}
+        Showing {_from}-{_to}
+        {typeof total === "number" ? ` of ${total}` : ""} {{ENTITY_HEADLINE_SINGULAR}}
       </p>
+    </div>
+  );
+}
+
+// pagination controls
+export function PaginationControls({
+  currentPage,
+  lastPage,
+  onPageChange,
+  loading,
+}: {
+  currentPage: number;
+  lastPage: number;
+  onPageChange: (page: number) => void;
+  loading?: boolean;
+}) {
+  const prev = () => onPageChange(Math.max(1, currentPage - 1));
+  const next = () => onPageChange(Math.min(lastPage, currentPage + 1));
+
+  // tampilkan maksimal 5 nomor halaman di sekitar current
+  const pages: number[] = [];
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(lastPage, currentPage + 2);
+  for (let i = start; i <= end; i++) pages.push(i);
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <button
+        className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+        onClick={prev}
+        disabled={loading || currentPage <= 1}
+      >
+        Prev
+      </button>
+
+      {start > 1 && (
+        <>
+          <button
+            className="px-3 py-1 rounded border text-sm"
+            onClick={() => onPageChange(1)}
+            disabled={loading}
+          >
+            1
+          </button>
+          {start > 2 && <span className="px-2">…</span>}
+        </>
+      )}
+
+      {pages.map((p) => (
+        <button
+          key={p}
+          className={`px-3 py-1 rounded border text-sm ${
+            p === currentPage ? "bg-primary text-primary-foreground" : ""
+          }`}
+          onClick={() => onPageChange(p)}
+          disabled={loading || p === currentPage}
+        >
+          {p}
+        </button>
+      ))}
+
+      {end < lastPage && (
+        <>
+          {end < lastPage - 1 && <span className="px-2">…</span>}
+          <button
+            className="px-3 py-1 rounded border text-sm"
+            onClick={() => onPageChange(lastPage)}
+            disabled={loading}
+          >
+            {lastPage}
+          </button>
+        </>
+      )}
+
+      <button
+        className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+        onClick={next}
+        disabled={loading || currentPage >= lastPage}
+      >
+        Next
+      </button>
     </div>
   );
 }

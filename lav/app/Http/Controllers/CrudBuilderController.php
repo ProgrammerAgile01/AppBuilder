@@ -1832,7 +1832,7 @@ PHP;
             // generate components page.tsx
             $searchKeys = collect($fields)
                 ->pluck('nama_kolom')
-                ->map(fn($n) => Str::camel($n));
+                ->map(fn($n) => Str::snake($n));
 
             $pageTemplate = File::get(base_path('stubs/frontend/components/page.stub'));
             File::put("$folderComp/$singularKebab-page.tsx", str_replace([

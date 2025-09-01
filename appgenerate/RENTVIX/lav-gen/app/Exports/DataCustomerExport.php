@@ -52,14 +52,15 @@ class DataCustomerExport implements
 
     public function headings(): array
     {
-        return ['New Content', 'New Content'];
+        return ['New Content', 'New Content', 'New Content'];
     }
 
     public function map($r): array
     {
         return [
             $r->nama_lengkap,
-            $r->alamat
+            $r->alamat,
+            $r->nama_instansi
         ];
     }
 

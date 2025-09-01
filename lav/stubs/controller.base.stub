@@ -14,24 +14,39 @@ class {{CONTROLLER_NAME}} extends Controller
 
     public function index(Request $request)
     {
+        // batas aman per_page (default 10, max 100)
+        $perPage = max(1, min((int) $request->query('per_page', 10), 100));
+
         $q = {{MODEL_NAME}}::query();
         if ($s = $request->get('search')) {
             $q->where(function ($w) use ($s) {
                 $w->where('id', 'like', "%$s%");
             });
         }
-        // return response()->json($q->paginate((int)($request->get('per_page', 15))));
 
         // opsional: urutan default
         $q->latest('id'); // atau created_at
 
-        $data = $q->get();
+        $data = $q->paginate($perPage)->appends($request->query());
 
         return response()->json([
             'success' => true,
-            'message' => 'Berhasil mengambil data',
-            'total'   => $data->count(),
-            'data'    => $data,
+            'message' => 'Berhasil menampilkan data',
+            'total' => $data->count(),
+            'data' => $data->items(),
+            'meta' => [
+                'current_page' => $data->currentPage(),
+                'per_page' => $data->perPage(),
+                'last_page' => $data->lastPage(),
+                'from' => $data->firstItem(),
+                'to' => $data->lastItem(),
+            ],
+            'links' => [
+                'first' => $data->url(1),
+                'last' => $data->url($data->lastPage()),
+                'prev' => $data->previousPageUrl(),
+                'next' => $data->nextPageUrl(),
+            ],
         ]);
     }
 

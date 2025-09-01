@@ -12,6 +12,11 @@
             "source": "alamat",
             "label": "New Content",
             "display": "text"
+        },
+        {
+            "source": "nama_instansi",
+            "label": "New Content",
+            "display": "text"
         }
     ],
     "summary": {

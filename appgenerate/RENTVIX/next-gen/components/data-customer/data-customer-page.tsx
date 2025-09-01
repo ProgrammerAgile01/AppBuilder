@@ -2,11 +2,10 @@
 
 import React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { DataCustomerHeader, DataCustomerFilters, DataCustomerTable, ResultsInfo } from "./data-customer-page-contents";
-import { deleteData, fetchData } from "@/lib/api";
+import { DataCustomerHeader, DataCustomerFilters, DataCustomerTable, ResultsInfo, PaginationControls } from "./data-customer-page-contents";
+import { deleteData, fetchPaginatedData } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { AppSidebar } from "../app-sidebar";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "../ui/sidebar";
+import { SidebarTrigger } from "../ui/sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,14 +23,24 @@ const ITEMS_PER_PAGE = 10
 
 export function DataCustomerPage() {
     const router = useRouter();
+    const { toast } = useToast();
+
     const [items, setItems] = useState<Record<string, any>[]>([]);
     // const [stats, setStats] = useState({});
     const [loading, setLoading] = useState(true);
-    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState<string>("all");
     const [typeFilter, setTypeFilter] = useState<string>("all");
     const [currentPage, setCurrentPage] = useState(1);
+
+    const [meta, setMeta] = useState<{
+        current_page?: number;
+        per_page?: number;
+        total?: number | null;
+        last_page?: number | null;
+        from?: number | null;
+        to?: number | null;
+    }>({});
 
     const refetch = useCallback(async (signal?: AbortSignal) => {
         setLoading(true);
@@ -41,9 +50,16 @@ export function DataCustomerPage() {
             //   fetchData("data-customers", { signal }),
             //   fetchModuleStats({ signal }),
             // ]);
-            const dataItems = await fetchData("data-customers", { signal });
+            const dataItems = await fetchPaginatedData("data-customers", {
+                signal,
+                params: {
+                    page: currentPage,
+                    per_page: ITEMS_PER_PAGE,
+                }
+            });
             if (signal?.aborted) return;
-            setItems(dataItems);
+            setItems(dataItems?.data ?? []);
+            setMeta(dataItems?.meta ?? {});
             // setStats(dataStats);
         } catch (err: any) {
             if (err?.name === "AbortError") return;
@@ -55,7 +71,7 @@ export function DataCustomerPage() {
         } finally {
             if (!signal?.aborted) setLoading(false);
         }
-    }, [toast]);
+    }, [toast, currentPage]);
 
     // scroll awal (tetap terpisah)
     useEffect(() => {
@@ -85,26 +101,22 @@ export function DataCustomerPage() {
             const q = (searchTerm ?? "").toLowerCase();
             if (!q) return items;
 
-            const SEARCH_KEYS = ["namaLengkap","alamat","namaInstansi"] as const;
+            const SEARCH_KEYS = ["nama_lengkap","alamat","nama_instansi"] as const;
 
             return items.filter((item) => SEARCH_KEYS.some((k) => toSearchStr((item as any)[k]).includes(q)));
 
         // })
     }, [items, searchTerm]);
 
-    const totalPages = Math.ceil(filteredDataCustomer.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedItems = filteredDataCustomer.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
     const handleDelete = async (id: string) => {
         try {
             await deleteData("data-customers", id);
-            toast({ title: "Berhasil!", description: "Data DataCustomer berhasil dihapus." });
+            toast({ title: "Success!", description: "DataCustomer Deleted Successfully." });
             setItems((prev) => prev.filter((item) => item.id !== id));
         } catch (error: any) {
             toast({
-            title: "Gagal menghapus",
-            description: error.message || "Terjadi kesalahan",
+            title: "Delete failed",
+            description: error.message || "There Is An Error",
             variant: "destructive",
             });
         }
@@ -166,8 +178,37 @@ export function DataCustomerPage() {
                         <ActionBar entity="data-customers" onDone={() => refetch()} />
                     </div>
                     <DataCustomerFilters searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-                    <ResultsInfo total={filteredDataCustomer.length} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} />
+                    <ResultsInfo
+                        total={meta?.total ?? filteredDataCustomer.length}
+                        currentPage={meta?.current_page ?? 1}
+                        itemsPerPage={meta?.per_page ?? ITEMS_PER_PAGE}
+                        from={
+                            meta?.from ??
+                            ((meta?.current_page ?? 1) - 1) *
+                                (meta?.per_page ?? ITEMS_PER_PAGE) +
+                                1
+                        }
+                        to={
+                            meta?.to ??
+                            (meta?.current_page ?? 1) * (meta?.per_page ?? ITEMS_PER_PAGE)
+                        }
+                    />
                     <DataCustomerTable handleView={handleView} handleDelete={handleDelete} filteredDataCustomer={filteredDataCustomer} />
+                    <PaginationControls
+                        currentPage={meta?.current_page ?? 1}
+                        lastPage={
+                            meta?.last_page ??
+                            Math.max(
+                                1,
+                                Math.ceil(
+                                (meta?.total ?? filteredDataCustomer.length) /
+                                    (meta?.per_page ?? ITEMS_PER_PAGE)
+                                )
+                            )
+                        }
+                        onPageChange={setCurrentPage}
+                        loading={loading}
+                    />
                 </div>
             </div>
         </>

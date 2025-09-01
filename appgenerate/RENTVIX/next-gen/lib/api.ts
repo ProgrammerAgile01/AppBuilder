@@ -77,6 +77,34 @@ export async function fetchData(entity: string, options?: { signal?: AbortSignal
   return rawData;
 }
 
+/* ========== Fetch paginated list (baru, untuk pagination server) ========== */
+export async function fetchPaginatedData(
+  entity: string,
+  options?: {
+    signal?: AbortSignal;
+    params?: Record<string, any>; // { page, per_page, sort, order, ... }
+  }
+) {
+  const url = new URL(`${API_URL}/${entity}`);
+  if (options?.params) {
+    Object.entries(options.params).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === "") return;
+      url.searchParams.append(k, String(v));
+    });
+  }
+
+  const res = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+    signal: options?.signal,
+  });
+  if (!res.ok) return parseError(res);
+
+  // bentuk respon mengikuti controller: { success, message, total, data, meta, links }
+  const j = await res.json();
+  return j;
+}
+
 /* ========== Create (auto JSON/FormData) ========== */
 export async function createData(entity: string, data: any) {
   const multipart = hasBinary(data);
