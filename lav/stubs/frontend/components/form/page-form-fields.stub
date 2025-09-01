@@ -162,7 +162,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}FormFields({
       toArray(v).map(toTag).filter(Boolean);
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-{{GRID_COLS}} gap-6">
             {{FORM_SECTION}}
         </div>
     )

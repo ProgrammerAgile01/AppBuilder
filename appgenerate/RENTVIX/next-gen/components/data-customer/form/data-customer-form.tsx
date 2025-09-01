@@ -20,7 +20,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { createData, updateData } from "@/lib/api";
 
 export function DataCustomerForm({
@@ -40,6 +40,7 @@ export function DataCustomerForm({
     const payload: any = {
       nama_lengkap: formData.nama_lengkap ?? undefined,
       alamat: formData.alamat ?? undefined,
+      nama_instansi: formData.nama_instansi ?? undefined,
     };
 
     return payload;
@@ -155,27 +156,38 @@ export function DataCustomerForm({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <DataCustomerFormFields
-              mode={mode}
-              formData={formData}
-              setFormData={setFormData}
-            />
-          </div>
-          <div className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-              className="border-border text-foreground hover:bg-accent hover:text-accent-foreground"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {mode === "create" ? "Add Data Customer" : "Update Data Customer"}
-            </Button>
-          </div>
+          <fieldset disabled={isSubmitting} className="space-y-6">
+            <div>
+              <DataCustomerFormFields
+                mode={mode}
+                formData={formData}
+                setFormData={setFormData}
+              />
+            </div>
+            <div className="flex justify-end gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                className="border-border text-foreground hover:bg-accent hover:text-accent-foreground"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {mode === "create" ? "Saving..." : "Updating..."}
+                  </>
+                ) : mode === "create" ? (
+                  "Add Data Customer"
+                ) : (
+                  "Update Data Customer"
+                )}
+              </Button>
+            </div>
+          </fieldset>
         </form>
       </div>
     </>

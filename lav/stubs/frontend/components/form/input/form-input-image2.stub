@@ -1,5 +1,5 @@
 <div className="space-y-1">
-  <Label htmlFor="{{FIELD}}">{{LABEL}}*</Label>
+  <Label htmlFor="{{FIELD}}">{{LABEL}}</Label>
   <Input
     type="file"
     accept="image/*"

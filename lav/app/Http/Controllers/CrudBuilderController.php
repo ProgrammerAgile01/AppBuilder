@@ -963,6 +963,7 @@ MD;
             $cardLayouts = $builder->cardLayout;
             $judulMenu = $builder->judul_menu;
             $menuNode = $builder->menu;
+            $totalCategory = $fieldCategories->count();
 
             // generate migrasi
             $this->generateMigration($table, $builder->fields);
@@ -986,7 +987,7 @@ MD;
             // Artisan::call('migrate');
 
             // generate frontend
-            $this->generateFrontend($judulMenu, $table, $builder->fields, $builder->judul, $builder->deskripsi, $fieldCategories, $tableLayout, $cardLayouts, $menuNode);
+            $this->generateFrontend($judulMenu, $table, $builder->fields, $builder->judul, $builder->deskripsi, $fieldCategories, $tableLayout, $cardLayouts, $menuNode, $totalCategory);
 
             // generate menu frontend
             // $this->updateFrontendMenu($table, $builder->modules->menu_title ?? 'Modul');
@@ -1510,7 +1511,7 @@ PHP;
     /**
      * FRONTEND CODEGEN (Next).
      */
-    private function generateFrontend($judulMenu, $table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts, $menuNode)
+    private function generateFrontend($judulMenu, $table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts, $menuNode, $totalCategory)
     {
         try {
             $entity = Str::camel($judulMenu); // cth: namaFiles
@@ -1780,18 +1781,22 @@ PHP;
                 }
 
                 //  section grid create
+
                 $sectionCardTemplate = File::get(base_path('stubs/frontend/components/form/form-section-card.stub'));
                 $sectionCard .= str_replace([
                     '{{CATEGORY_NAME}}',
-                    '{{FORM_INPUTS}}'
+                    '{{FORM_INPUTS}}',
                 ], [
                     $categoryTitle,
-                    $inputFields
+                    $inputFields,
                 ], $sectionCardTemplate) . "\n\n";
             }
 
             // DIBAWAH INI KODENYA BELUM SELESAI YAA LANJUTKAN
             // $tagsField = collect($fields)->filter(fn($f) => in_array($f->tipe_input ?? '', ['tags']))->
+
+            // ketika cuma 1 kategori maka menjadi grid-cols-1
+            $grid = $totalCategory === 1 ? 1 : 2;
             
             $formFieldsTemplate = File::get(base_path('stubs/frontend/components/form/page-form-fields.stub'));
             File::put("$folderForm/$singularKebab-form-fields.tsx", str_replace([
@@ -1806,7 +1811,8 @@ PHP;
                 '{{ENTITY_PLURAL}}',
                 // '{{FORM_INPUTS}}',
                 // '{{CATEGORY_NAME}}',
-                '{{FORM_SECTION}}'
+                '{{FORM_SECTION}}',
+                '{{GRID_COLS}}'
             ], [
                 $entityKebab,
                 $entity,
@@ -1819,7 +1825,8 @@ PHP;
                 $entityPlural,
                 // $inputFields,
                 // $categoryTitle
-                $sectionCard
+                $sectionCard,
+                $grid
             ], $formFieldsTemplate));
 
             // generate components page.tsx

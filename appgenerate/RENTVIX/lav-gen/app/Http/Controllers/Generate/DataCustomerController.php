@@ -40,11 +40,13 @@ class DataCustomerController extends Controller
         $validated = $request->validate([
             'nama_lengkap' => 'required',
             'alamat' => 'required',
+            'nama_instansi' => 'required',
         ]);
 
         $data = [];
         $data['nama_lengkap'] = $validated['nama_lengkap'] ?? null;
         $data['alamat'] = $validated['alamat'] ?? null;
+        $data['nama_instansi'] = $validated['nama_instansi'] ?? null;
 
 
 
@@ -64,11 +66,13 @@ class DataCustomerController extends Controller
         $validated = $request->validate([
             'nama_lengkap' => 'required',
             'alamat' => 'required',
+            'nama_instansi' => 'required',
         ]);
 
         $data = [];
         $data['nama_lengkap'] = $validated['nama_lengkap'] ?? null;
         $data['alamat'] = $validated['alamat'] ?? null;
+        $data['nama_instansi'] = $validated['nama_instansi'] ?? null;
 
         $oldFilesToDelete = [];
 

@@ -170,7 +170,7 @@ export function DataCustomerFormFields({
     <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1">
-  <Label htmlFor="nama_lengkap" className="text-foreground">Nama Lengkap*</Label>
+  <Label htmlFor="nama_lengkap" className="text-foreground">Nama Lengkap</Label>
   <Input
     type="text"
     id="nama_lengkap"
@@ -183,11 +183,36 @@ export function DataCustomerFormFields({
 </div>
 
 <div className="space-y-1">
+  <Label htmlFor="alamat" className="text-foreground">Alamat</Label>
   <Textarea
     value={formData.alamat || ""}
     onChange={(e) => setFormData((prev) => ({ ...prev, "alamat": e.target.value }))}
     placeholder="Alamat Rumah Anda"
     rows={4}
+    className="text-foreground placeholder:text-muted-foreground"
+    required
+  />
+</div>
+
+
+        </div>
+    </CardContent>
+</Card>
+
+<Card>
+    <CardHeader>
+        <CardTitle className="text-foreground">Pendidikan</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1">
+  <Label htmlFor="nama_instansi" className="text-foreground">Nama Instansi</Label>
+  <Input
+    type="text"
+    id="nama_instansi"
+    placeholder="Masukkan alamat instansi pendidikan..."
+    value={formData.nama_instansi || ""}
+    onChange={(e) => setFormData((prev) => ({ ...prev, "nama_instansi": e.target.value }))}
     className="text-foreground placeholder:text-muted-foreground"
     required
   />

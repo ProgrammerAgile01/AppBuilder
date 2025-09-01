@@ -1,22 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Car,
-  Circle,
-  Edit,
-  Eye,
-  Fuel,
-  MapPin,
-  Plus,
-  Trash2,
-  Users,
-  Download,
-  Sparkles,
-  Upload,
-  FileSpreadsheet,
-  Calendar,
-} from "lucide-react";
+import { Car, Circle, Edit, Eye, Fuel, MapPin, Plus, Trash2, Users, Download, Sparkles, Upload, FileSpreadsheet, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,22 +11,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 import {
@@ -52,14 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 // import { type Vehicle } from "@/lib/vehicle-data";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -86,10 +54,8 @@ export function DataCustomerHeader({
   const handleExportExcel = async () => {
     try {
       setIsExporting(true);
-      await downloadExcel(
-        "data-customers",
-        {
-          // metadata header + tanda tangan di file Excel:
+      await downloadExcel("data-customers", {
+        // metadata header + tanda tangan di file Excel:
           city: "Boyolali",
           approved_by_name: "Manager Operasional",
           approved_by_title: "Manager Operasional",
@@ -97,37 +63,33 @@ export function DataCustomerHeader({
 
           // set true kalau backend pakai session/cookie auth
           withCredentials: false,
-        },
-        "dataCustomer_export.xlsx"
-      );
+      },
+      "dataCustomer_export.xlsx"
+    );
     } catch (e: any) {
       alert(e?.message || "Gagal export Excel");
     } finally {
       setIsExporting(false);
     }
-  };
+  }
 
   const handleExportPDF = async () => {
     try {
       setIsExporting(true);
-      await downloadPdf(
-        "data-customers",
-        {
-          approver_name: "Budi Santoso",
-          approver_title: "Kepala Operasional",
-          place: "Boyolali",
-          // columns: "plate_number,brand,year,status", // kalau mau custom kolom
-          // limit: 200,
-          withCredentials: false,
-        },
-        "dataCustomer_report.pdf"
-      );
+      await downloadPdf("data-customers", {
+        approver_name: "Budi Santoso",
+        approver_title: "Kepala Operasional",
+        place: "Boyolali",  
+        // columns: "plate_number,brand,year,status", // kalau mau custom kolom
+        // limit: 200,
+        withCredentials: false,
+      }, "dataCustomer_report.pdf");
     } catch (e: any) {
       alert(e?.message || "Gagal export PDF");
     } finally {
       setIsExporting(false);
     }
-  };
+  }
 
   // next feature
   const handleImportExcel = () => alert("TODO: Import CSV/Excel");
@@ -148,9 +110,7 @@ export function DataCustomerHeader({
                 disabled={isExporting || isImporting}
               >
                 <Download className="h-4 w-4 mr-2" />
-                {isExporting || isImporting
-                  ? "Processing..."
-                  : "Export/Import"}{" "}
+                {isExporting || isImporting ? "Processing..." : "Export/Import"}{" "}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -226,11 +186,11 @@ export function DataCustomerHeader({
 export function DataCustomerFilters({
   searchTerm,
   setSearchTerm,
-}: // statusFilter,
-// setStatusFilter,
-// typeFilter,
-// setTypeFilter,
-{
+  // statusFilter,
+  // setStatusFilter,
+  // typeFilter,
+  // setTypeFilter,
+}: {
   searchTerm: string;
   setSearchTerm: (val: string) => void;
   // statusFilter: string;
@@ -281,7 +241,7 @@ export function DataCustomerFilters({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 export function ResultsInfo({
@@ -298,8 +258,7 @@ export function ResultsInfo({
   return (
     <div className="flex justify-between items-center">
       <p className="text-sm text-muted-foreground">
-        Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, total)} of{" "}
-        {total} Data Customer
+        Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, total)} of {total} Data Customer
       </p>
     </div>
   );
@@ -333,13 +292,19 @@ function MobileDataCustomerCard({
                 <h3 className="font-semibold text-lg truncate text-gray-900 dark:text-foreground">
                   {filteredDataCustomer.nama_lengkap}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-foreground"></p>
+                <p className="text-sm text-gray-600 dark:text-foreground">
+                  
+                </p>
               </div>
+              
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs mb-3"></div>
+            <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+              
+            </div>
 
             <div className="flex justify-between items-center">
+              
               <div className="flex gap-1">
                 <Button
                   variant="outline"
@@ -365,9 +330,8 @@ function MobileDataCustomerCard({
                         Delete Vehicle
                       </AlertDialogTitle>
                       <AlertDialogDescription className="text-muted-foreground">
-                        Are you sure you want to delete{" "}
-                        {filteredDataCustomer.nama_lengkap}? This action cannot
-                        be undone.
+                        Are you sure you want to delete {filteredDataCustomer.nama_lengkap}?
+                        This action cannot be undone.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -388,14 +352,14 @@ function MobileDataCustomerCard({
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 // desktop View
 export function DataCustomerTable({
   handleView,
   handleDelete,
-  filteredDataCustomer,
+  filteredDataCustomer
 }: {
   handleView: (id: string) => void;
   handleDelete: (id: string) => void;
@@ -420,34 +384,24 @@ export function DataCustomerTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-foreground">Nama</TableHead>
-              <TableHead className="text-foreground">Alamat</TableHead>
+              <TableHead className='text-foreground'>Nama</TableHead>
+<TableHead className='text-foreground'>Alamat</TableHead>
 
               <TableHead className="text-right text-foreground">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredDataCustomer.map((item: any) => (
+            { filteredDataCustomer.map((item: any) => (
               <TableRow key={item.id}>
-                <TableCell className="text-left">
-                  <div className="text-sm font-normal text-gray-900 dark:text-foreground">
-                    {item.nama_lengkap}
-                  </div>
-                </TableCell>
-                <TableCell className="text-left">
-                  <div className="text-sm font-normal text-gray-900 dark:text-foreground">
-                    {item.alamat}
-                  </div>
-                </TableCell>
+                <TableCell className='text-left'><div className='text-sm font-normal text-gray-900 dark:text-foreground'>{item.nama_lengkap}</div>
+</TableCell>
+<TableCell className='text-left'><div className='text-sm font-normal text-gray-900 dark:text-foreground'>{item.alamat}</div>
+</TableCell>
 
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {/* show */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleView(item.id)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => handleView(item.id)}>
                       <Eye className="h-4 w-4" />
                     </Button>
 
@@ -473,21 +427,18 @@ export function DataCustomerTable({
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Batal</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(item.id)}
-                          >
-                            Hapus
-                          </AlertDialogAction>
+                          <AlertDialogAction onClick={() => handleDelete(item.id)}>Hapus</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            )) }
           </TableBody>
         </Table>
       </CardContent>
     </Card>
-  );
+  )
 }
+

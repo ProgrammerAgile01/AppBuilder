@@ -1,5 +1,5 @@
 <div className="space-y-1">
-  <Label htmlFor="{{FIELD}}" className="text-foreground">{{LABEL}}*</Label>
+  <Label htmlFor="{{FIELD}}" className="text-foreground">{{LABEL}}</Label>
   <Input
     type="{{TYPE}}"
     id="{{FIELD}}"

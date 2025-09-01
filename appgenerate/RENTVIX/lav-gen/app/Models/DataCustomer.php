@@ -9,7 +9,8 @@ class DataCustomer extends Model
     protected $table = 'mst_customer';
     protected $fillable = [
         'nama_lengkap',
-        'alamat'
+        'alamat',
+        'nama_instansi'
     ];
 
     

@@ -1,4 +1,5 @@
 <div className="space-y-1">
+  <Label htmlFor="{{FIELD}}" className="text-foreground">{{LABEL}}</Label>
   <Textarea
     value={formData.{{FIELD}} || ""}
     onChange={(e) => setFormData((prev) => ({ ...prev, "{{FIELD}}": e.target.value }))}

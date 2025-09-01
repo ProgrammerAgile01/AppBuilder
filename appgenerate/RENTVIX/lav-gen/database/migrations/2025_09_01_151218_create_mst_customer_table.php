@@ -10,6 +10,7 @@ return new class extends Migration {
             $table->id();
             $table->string('nama_lengkap');
             $table->text('alamat');
+            $table->string('nama_instansi');
 
             $table->timestamps();
         });
