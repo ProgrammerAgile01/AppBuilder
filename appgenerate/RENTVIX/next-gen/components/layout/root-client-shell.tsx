@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";   // ← import SidebarInset
 import { AppSidebar, appSidebarMenuItems } from "@/components/app-sidebar";
 import { MobileTabBar } from "@/components/navigation/mobile-tab-bar";
 import { MobileMenuDrawer } from "@/components/navigation/mobile-menu-drawer";
@@ -11,15 +11,13 @@ export function RootClientShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen>
-      {/* Penting: render AppSidebar TANPA hidden lg:block,
-          biar CSS var sidebar bekerja untuk halaman yang sudah punya SidebarInset */}
+      {/* Sidebar harus jadi saudara langsung dari SidebarInset */}
       <AppSidebar />
 
-      {/* Jangan tambah SidebarInset di sini.
-          Biarkan setiap page yg sudah punya SidebarInset mengatur offset-nya. */}
-      <main className="min-h-dvh flex-1 pb-[calc(env(safe-area-inset-bottom)+88px)] lg:pb-0">
+      {/* ⬇️ Inilah kuncinya: pakai SidebarInset sebagai SIBLING Sidebar */}
+      <SidebarInset>
         {children}
-      </main>
+      </SidebarInset>
 
       {/* Mobile bottom bar + drawer */}
       <MobileTabBar onOpenMenu={() => setOpen(true)} />

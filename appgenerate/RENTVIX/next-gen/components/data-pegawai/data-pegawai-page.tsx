@@ -142,66 +142,61 @@ export function DataPegawaiPage() {
 
   return (
     <>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          {/* NOTEE BREADCUMB DI SESUAIKAN SAMA ROUTE MENU NANTI */}
-          <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <SidebarTrigger className="-ml-1 h-7 w-7 border border-black/20 text-black hover:bg-black/10 hover:text-black dark:border-white/30 dark:text-white dark:hover:bg-white/20 dark:hover:text-white" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink
-                    href="/"
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Dashboard
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink
-                    href="/vehicles" // linknya juga diubah ketika sudah ada modul menu
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    {/* Operations */} {/* diisi nama modul menu y */}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="text-foreground">
-                    Data Pegawai
-                  </BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </header>
+      {/* NOTEE BREADCUMB DI SESUAIKAN SAMA ROUTE MENU NANTI */}
+      <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <SidebarTrigger className="-ml-1 h-7 w-7 border border-black/20 text-black hover:bg-black/10 hover:text-black dark:border-white/30 dark:text-white dark:hover:bg-white/20 dark:hover:text-white" />
+        <Separator orientation="vertical" className="mr-2 h-4" />
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbLink
+                href="/"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Dashboard
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="hidden md:block" />
+            <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbLink
+                href="/vehicles" // linknya juga diubah ketika sudah ada modul menu
+                className="text-muted-foreground hover:text-foreground"
+              >
+                {/* Operations */} {/* diisi nama modul menu y */}
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator className="hidden md:block" />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="text-foreground">
+                Data Pegawai
+              </BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </header>
 
-          <div className="flex flex-1 flex-col">
-            <div className="space-y-6 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <DataPegawaiHeader onAdd={handleAdd} />
-                <ActionBar entity="data-pegawais" onDone={() => refetch()} />
-              </div>
-              <DataPegawaiFilters
-                searchTerm={searchTerm}
-                setSearchTerm={setSearchTerm}
-              />
-              <ResultsInfo
-                total={filteredDataPegawai.length}
-                currentPage={currentPage}
-                itemsPerPage={ITEMS_PER_PAGE}
-              />
-              <DataPegawaiTable
-                handleView={handleView}
-                handleDelete={handleDelete}
-                filteredDataPegawai={filteredDataPegawai}
-              />
-            </div>
+      <div className="flex flex-1 flex-col">
+        <div className="space-y-6 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <DataPegawaiHeader onAdd={handleAdd} />
+            <ActionBar entity="data-pegawais" onDone={() => refetch()} />
           </div>
-        </SidebarInset>
-      </SidebarProvider>
+          <DataPegawaiFilters
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+          />
+          <ResultsInfo
+            total={filteredDataPegawai.length}
+            currentPage={currentPage}
+            itemsPerPage={ITEMS_PER_PAGE}
+          />
+          <DataPegawaiTable
+            handleView={handleView}
+            handleDelete={handleDelete}
+            filteredDataPegawai={filteredDataPegawai}
+          />
+        </div>
+      </div>
     </>
   );
   // return <DataPegawaiContents items={items} loading={loading} stats={stats} />;
