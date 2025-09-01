@@ -21,6 +21,7 @@ import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { Suspense } from "react";
 import { EarlyWarningReminder } from "@/components/early-warning-reminder";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useRouter } from "next/navigation";
 
 const quickActions = [
   {
@@ -344,6 +345,7 @@ function DashboardContent() {
 export default function HomePage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const router = useRouter();
 
   // Check authentication status on mount
   useEffect(() => {
@@ -371,9 +373,11 @@ export default function HomePage() {
     sessionStorage.clear();
   };
 
-  if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
+  // ini nanti ketika sudah buat login disesuaikan ya
+  // if (!isAuthenticated) {
+  //   router.push("/login");
+  //   return null; // jangan render apa pun di sini
+  // }
 
   return (
     <>

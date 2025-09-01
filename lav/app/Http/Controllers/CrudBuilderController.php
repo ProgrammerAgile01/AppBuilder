@@ -21,7 +21,7 @@ class CrudBuilderController extends Controller
     public function index()
     {
         try {
-            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderBy('updated_at')->get();
+            $builders = CrudBuilder::withoutTrashed()->withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu'])->orderBy('updated_at')->get();
 
             return response()->json([
                 'success' => true,
@@ -243,7 +243,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil membuat builder',
-                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu'),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -255,22 +255,13 @@ class CrudBuilderController extends Controller
         }
     }
 
-    // private function syncTotals($modulesId)
-    // {
-    //     Modules::where('id', $modulesId)->update([
-    //         'total_categories' => CrudBuilder::where('modules_id', $modulesId)->count(),
-    //         'total_columns' => CrudField::whereHas('builder', fn($q) => $q->where('modules_id', $modulesId))->count(),
-    //         'total_stats' => CrudStatistic::whereHas('builder', fn($q) => $q->where('modules_id', $modulesId))->count(),
-    //     ]);
-    // }
-
     /**
      * Display the specified resource.
      */
     public function show($id)
     {
         try {
-            $builder = CrudBuilder::withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::withCount('fields')->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
@@ -407,7 +398,7 @@ class CrudBuilderController extends Controller
         DB::beginTransaction();
         try {
             // 2) AMBIL BUILDER
-            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu'])->findOrFail($id);
 
             // 3) UPDATE MASTER BUILDER
             $builder->update($request->only([
@@ -531,7 +522,7 @@ class CrudBuilderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Berhasil memperbarui builder',
-                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'),
+                'data' => $builder->load('product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu'),
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -573,7 +564,7 @@ class CrudBuilderController extends Controller
 
     public function deletedBuilder()
     {
-        $builder = CrudBuilder::onlyTrashed()->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->orderByDesc('deleted_at')->get();
+        $builder = CrudBuilder::onlyTrashed()->with(['product.templateFrontend', 'fieldCategories.columns', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu'])->orderByDesc('deleted_at')->get();
 
         $totalBuilderDihapus = CrudBuilder::onlyTrashed()->count();
 
@@ -955,7 +946,7 @@ MD;
     {
         try {
             // load builder dengan relasi
-            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout'])->findOrFail($id);
+            $builder = CrudBuilder::with(['product.templateFrontend', 'fieldCategories', 'fields', 'stats', 'tableLayout.columns.contents', 'cardLayout', 'menu.parent'])->findOrFail($id);
 
             // Set root per product & bootstrap skeleton proyek jika belum ada
             $this->setProjectRoots($builder);
@@ -971,6 +962,7 @@ MD;
             $tableLayout = $builder->tableLayout;
             $cardLayouts = $builder->cardLayout;
             $judulMenu = $builder->judul_menu;
+            $menuNode = $builder->menu;
 
             // generate migrasi
             $this->generateMigration($table, $builder->fields);
@@ -994,7 +986,7 @@ MD;
             // Artisan::call('migrate');
 
             // generate frontend
-            $this->generateFrontend($judulMenu, $table, $builder->fields, $builder->judul, $builder->deskripsi, $fieldCategories, $tableLayout, $cardLayouts);
+            $this->generateFrontend($judulMenu, $table, $builder->fields, $builder->judul, $builder->deskripsi, $fieldCategories, $tableLayout, $cardLayouts, $menuNode);
 
             // generate menu frontend
             // $this->updateFrontendMenu($table, $builder->modules->menu_title ?? 'Modul');
@@ -1518,7 +1510,7 @@ PHP;
     /**
      * FRONTEND CODEGEN (Next).
      */
-    private function generateFrontend($judulMenu, $table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts)
+    private function generateFrontend($judulMenu, $table, $fields, $title, $deskripsi, $fieldCategories, $tableLayout, $cardLayouts, $menuNode)
     {
         try {
             $entity = Str::camel($judulMenu); // cth: namaFiles
@@ -1553,6 +1545,35 @@ PHP;
             // Publish runtime Frontend (sekali)
             $this->publishStub(base_path('stubs/frontend/runtime/lib-actions.stub'),  $this->frontPath("lib/actions.ts"));
             $this->publishStub(base_path('stubs/frontend/runtime/ActionBar.stub'),    $this->frontPath("components/actions/ActionBar.tsx"));
+
+            // menu
+            $trail = [];
+
+            // naik ke atas sampai root menu
+            if ($menuNode) {
+                $node = $menuNode;
+                while ($node) {
+                    $trail[] = [
+                        'title' => $node->title,
+                        'route_path' => $node->route_path ?: null,
+                        'level' => $node->level,
+                        'type' => $node->type,
+                    ];
+                    $node = $node->parent;
+                }
+                $trail = array_reverse($trail);
+            }
+
+            // fallback kalau belum ada menu untuk builder ini
+            if (empty($trail)) {
+                $trail = [
+                    [ 'title' => $judulMenu, 'route_path' => '/'.$singularKebab ]
+                ];
+            }
+
+            // siapkan nilai yang akan ditanam ke stub
+            $breadcrumbJson = json_encode($trail, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+            $menuRoutePath  = $menuNode->route_path ?? '/'.$singularKebab;
 
             // generate index (app/(nama-folder)/page.tsx)
             $indexTemplate = File::get(base_path('stubs/frontend/app/page-index.stub'));
@@ -1663,6 +1684,8 @@ PHP;
                 '{{ENTITY_PLURAL}}',
                 '{{PAYLOAD_OBJECT}}',
                 '{{PAYLOAD_FILES}}',
+                '{{MENU_ROUTE_PATH}}',
+                '{{BREADCRUMB_JSON}}'
             ], [
                 $entityKebab,
                 $entity,
@@ -1675,6 +1698,8 @@ PHP;
                 $entityPlural,
                 rtrim($payloadObject), // baris mapping fields
                 rtrim($payloadFiles), // baris file/image handling
+                $menuRoutePath,
+                $breadcrumbJson
             ], $pageFormTemplate));
 
             // generate components form/form-fields.tsx
@@ -1813,7 +1838,9 @@ PHP;
                 '{{ENTITY_HEADLINE_SINGULAR}}',
                 '{{ENTITY_KEBAB_SINGULAR}}',
                 '{{SEARCH_KEYS}}',
-                '{{TITLE}}'
+                '{{TITLE}}',
+                '{{MENU_ROUTE_PATH}}',
+                '{{BREADCRUMB_JSON}}'
             ], [
                 $entityKebab,
                 $entity,
@@ -1824,7 +1851,9 @@ PHP;
                 $singularHeadline,
                 $singularKebab,
                 $searchKeys,
-                $title
+                $title,
+                $menuRoutePath,
+                $breadcrumbJson
             ], $pageTemplate));
 
             // generate components page-content.tsx
@@ -1853,6 +1882,13 @@ PHP;
             $subJudulSize = $cardSchema['subjudul']['size'] ?? null;
             $subJudulWeight = $cardSchema['subjudul']['weight'] ?? null;
             $subJudulColor = $cardSchema['subjudul']['color'] ?? null;
+
+            $subJudulContent = '';
+            if (!empty($subJudul)) {
+                $subJudulContent = <<<SUBJUDUL
+    {filtered{$singularPascal}.{$subJudul}}
+    SUBJUDUL;
+            }
 
             $status = $cardSchema['status']['field'] ?? null;
             $statusBadgeCase = '';
@@ -1927,7 +1963,7 @@ BADGE;
                 '{{JUDUL_SIZE}}',
                 '{{JUDUL_WEIGHT}}',
                 '{{JUDUL_COLOR}}',
-                '{{SUBJUDUL}}',
+                '{{SUBJUDUL_CONTENT}}',
                 '{{SUBJUDUL_SIZE}}',
                 '{{SUBJUDUL_WEIGHT}}',
                 '{{SUBJUDUL_COLOR}}',
@@ -1945,7 +1981,7 @@ BADGE;
                 $judulSize,
                 $judulWeight,
                 $judulColor,
-                $subJudul,
+                $subJudulContent,
                 $subJudulSize,
                 $subJudulWeight,
                 $subJudulColor,

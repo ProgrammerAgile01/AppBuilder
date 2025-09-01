@@ -100,6 +100,27 @@ class MenuSeeder extends Seeder
   ),
   4 => 
   array (
+    'id' => 8,
+    'parent_id' => 4,
+    'level' => 2,
+    'type' => 'module',
+    'title' => 'Customer',
+    'icon' => 'Users',
+    'color' => NULL,
+    'order_number' => 2,
+    'crud_builder_id' => NULL,
+    'product_code' => 'RENTVIX',
+    'route_path' => NULL,
+    'is_active' => true,
+    'note' => 'Master Customer',
+    'created_by' => NULL,
+    'deleted_at' => NULL,
+    'created_at' => '2025-09-01T03:32:27.000000Z',
+    'updated_at' => '2025-09-01T03:32:27.000000Z',
+    'is_deleted' => false,
+  ),
+  5 => 
+  array (
     'id' => 3,
     'parent_id' => 2,
     'level' => 3,
@@ -119,7 +140,7 @@ class MenuSeeder extends Seeder
     'updated_at' => '2025-08-29T09:33:39.000000Z',
     'is_deleted' => false,
   ),
-  5 => 
+  6 => 
   array (
     'id' => 6,
     'parent_id' => 5,
@@ -140,7 +161,28 @@ class MenuSeeder extends Seeder
     'updated_at' => '2025-08-30T05:15:02.000000Z',
     'is_deleted' => false,
   ),
-  6 => 
+  7 => 
+  array (
+    'id' => 9,
+    'parent_id' => 8,
+    'level' => 3,
+    'type' => 'menu',
+    'title' => 'Data Customer',
+    'icon' => 'Users',
+    'color' => NULL,
+    'order_number' => 1,
+    'crud_builder_id' => 6,
+    'product_code' => 'RENTVIX',
+    'route_path' => '/data-customer',
+    'is_active' => true,
+    'note' => NULL,
+    'created_by' => NULL,
+    'deleted_at' => NULL,
+    'created_at' => '2025-09-01T03:32:39.000000Z',
+    'updated_at' => '2025-09-01T03:32:39.000000Z',
+    'is_deleted' => false,
+  ),
+  8 => 
   array (
     'id' => 7,
     'parent_id' => 5,

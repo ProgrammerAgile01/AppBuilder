@@ -1,0 +1,21 @@
+{
+    "title": "Data Customer",
+    "menu_title": "Data Customer",
+    "table": "mst_customer",
+    "columns": [
+        {
+            "source": "nama_lengkap",
+            "label": "New Content",
+            "display": "text"
+        },
+        {
+            "source": "alamat",
+            "label": "New Content",
+            "display": "text"
+        }
+    ],
+    "summary": {
+        "group_by": "status",
+        "sum": []
+    }
+}

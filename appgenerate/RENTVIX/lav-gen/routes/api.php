@@ -33,3 +33,10 @@ Route::apiResource('menus', MenuController::class);
 
 
 
+
+
+// Route for data-customers
+Route::get('data-customers/actions', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'listActions']);
+Route::match(['GET','POST'], 'data-customers/actions/{actionKey}', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'runAction']);
+Route::get('data-customers/export-excel', [\App\Http\Controllers\Generate\DataCustomerController::class, 'exportExcel']);
+Route::apiResource('data-customers', \App\Http\Controllers\Overrides\DataCustomerController::class);

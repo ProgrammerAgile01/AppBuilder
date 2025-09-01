@@ -34,14 +34,6 @@ class CrudBuilder extends Model
         'deleted_at',
     ];
 
-    // protected $with = ['fields', 'stats'];
-
-    // relasi ke modules
-    // public function modules()
-    // {
-    //     return $this->belongsTo(Modules::class, 'modules_id');
-    // }
-
     // relasi kategori field
     public function fieldCategories()
     {
@@ -76,5 +68,11 @@ class CrudBuilder extends Model
     public function product() 
     {
         return $this->belongsTo(Product::class);
+    }
+
+    // relasi hasOne menus
+    public function menu()
+    {
+        return $this->hasOne(Menu::class);
     }
 }

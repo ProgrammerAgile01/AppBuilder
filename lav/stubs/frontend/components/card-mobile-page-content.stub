@@ -15,7 +15,7 @@
                   {filtered{{ENTITY_PASCAL_SINGULAR}}.{{JUDUL}}}
                 </h3>
                 <p className="text-{{SUBJUDUL_SIZE}} {{SUBJUDUL_COLOR}} dark:text-foreground">
-                  {filtered{{ENTITY_PASCAL_SINGULAR}}.{{SUBJUDUL}}}
+                  {{SUBJUDUL_CONTENT}}
                 </p>
               </div>
               {{STATUS_BADGE}}

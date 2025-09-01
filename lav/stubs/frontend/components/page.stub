@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { {{ENTITY_PASCAL_SINGULAR}}Header, {{ENTITY_PASCAL_SINGULAR}}Filters, {{ENTITY_PASCAL_SINGULAR}}Table, ResultsInfo } from "./{{ENTITY_KEBAB_SINGULAR}}-page-contents";
 import { deleteData, fetchData } from "@/lib/api";
@@ -117,52 +118,58 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
         router.push(`/{{ENTITY_KEBAB_SINGULAR}}/view/${id}`);
     };
 
+    const CRUMBS = {{BREADCRUMB_JSON}} as { title: string; route_path?: string|null; level: number; type: string }[];
+
     return (
         <>
-                    {/* NOTEE BREADCUMB DI SESUAIKAN SAMA ROUTE MENU NANTI */}
-                    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                        <SidebarTrigger className="-ml-1 h-7 w-7 border border-black/20 text-black hover:bg-black/10 hover:text-black dark:border-white/30 dark:text-white dark:hover:bg-white/20 dark:hover:text-white" />
-                        <Separator orientation="vertical" className="mr-2 h-4" />
-                        <Breadcrumb>
-                            <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink
-                                        href="/"
-                                        className="text-muted-foreground hover:text-foreground"
-                                    >
-                                        Dashboard
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink
-                                        href="/vehicles" // linknya juga diubah ketika sudah ada modul menu
-                                        className="text-muted-foreground hover:text-foreground"
-                                    >
-                                        {/* Operations */} {/* diisi nama modul menu y */}
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage className="text-foreground">
-                                        {{TITLE}}
-                                    </BreadcrumbPage>
-                                </BreadcrumbItem>
-                            </BreadcrumbList>
-                        </Breadcrumb>
-                    </header>
+            <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b px-4 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <SidebarTrigger className="-ml-1 h-7 w-7 border border-black/20 text-black hover:bg-black/10 hover:text-black dark:border-white/30 dark:text-white dark:hover:bg-white/20 dark:hover:text-white" />
+                <Separator orientation="vertical" className="mr-2 h-4" />
+                <Breadcrumb>
+                    <BreadcrumbList>
+                        {/* <BreadcrumbItem className="hidden md:block">
+                            <BreadcrumbLink
+                                href="/"
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                Dashboard
+                            </BreadcrumbLink>
+                        </BreadcrumbItem> */}
+                        {CRUMBS.map((c, i) => (
+                            <React.Fragment key={i}>
+                                {i < CRUMBS.length - 1 ? (
+                                    <>
+                                        <BreadcrumbItem className="md:block">
+                                            {/* <BreadcrumbLink href={c.route_path || "#"} className="text-muted-foreground hover:text-foreground"> */}
+                                                {c.title}
+                                            {/* </BreadcrumbLink> */}
+                                        </BreadcrumbItem>
+                                        <BreadcrumbSeparator className="md:block" />
+                                    </>
+                                ) : (
+                                    <BreadcrumbItem>
+                                        <BreadcrumbPage className="text-foreground">
+                                            {c.title /* item terakhir = halaman saat ini */}
+                                        </BreadcrumbPage>
+                                    </BreadcrumbItem>
+                                )}
+                                </React.Fragment>
+                        ))}
+                    </BreadcrumbList>
+                </Breadcrumb>
+            </header>
 
-                    <div className="flex flex-1 flex-col">
-                        <div className="space-y-6 p-4">
-                            <div className="flex items-center justify-between gap-3">
-                                <{{ENTITY_PASCAL_SINGULAR}}Header onAdd={handleAdd} />
-                                <ActionBar entity="{{ENTITY_PLURAL}}" onDone={() => refetch()} />
-                            </div>
-                            <{{ENTITY_PASCAL_SINGULAR}}Filters searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-                            <ResultsInfo total={filtered{{ENTITY_PASCAL_SINGULAR}}.length} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} />
-                            <{{ENTITY_PASCAL_SINGULAR}}Table handleView={handleView} handleDelete={handleDelete} filtered{{ENTITY_PASCAL_SINGULAR}}={filtered{{ENTITY_PASCAL_SINGULAR}}} />
-                        </div>
+            <div className="flex flex-1 flex-col">
+                <div className="space-y-6 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <{{ENTITY_PASCAL_SINGULAR}}Header onAdd={handleAdd} />
+                        <ActionBar entity="{{ENTITY_PLURAL}}" onDone={() => refetch()} />
                     </div>
+                    <{{ENTITY_PASCAL_SINGULAR}}Filters searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+                    <ResultsInfo total={filtered{{ENTITY_PASCAL_SINGULAR}}.length} currentPage={currentPage} itemsPerPage={ITEMS_PER_PAGE} />
+                    <{{ENTITY_PASCAL_SINGULAR}}Table handleView={handleView} handleDelete={handleDelete} filtered{{ENTITY_PASCAL_SINGULAR}}={filtered{{ENTITY_PASCAL_SINGULAR}}} />
+                </div>
+            </div>
         </>
     );
     // return <{{ENTITY_PASCAL_SINGULAR}}Contents items={items} loading={loading} stats={stats} />;
