@@ -20,7 +20,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { createData, updateData } from "@/lib/api";
 
 export function {{ENTITY_PASCAL_SINGULAR}}Form({
@@ -51,19 +51,19 @@ export function {{ENTITY_PASCAL_SINGULAR}}Form({
             
             if (mode === "create") {
                 await createData("{{ENTITY_PLURAL}}", payload);
-                toast({ title: "Berhasil!", description: "{{ENTITY_HEADLINE_SINGULAR}} berhasil dibuat"})
+                toast({ title: "Success!", description: "{{ENTITY_HEADLINE_SINGULAR}} created"})
             } else {
                 await updateData("{{ENTITY_PLURAL}}", formData.id!, payload)
                 toast({
-                    title: "Berhasil!",
-                    description: "{{ENTITY_HEADLINE_SINGULAR}} berhasil diperbarui"
+                    title: "Success!",
+                    description: "{{ENTITY_HEADLINE_SINGULAR}} updated"
                 })
             }
             router.push("/{{ENTITY_KEBAB_SINGULAR}}");
         } catch (error: any) {
             toast({
-                title: "Gagal",
-                description: error.message || "Terjadi kesalahan.",
+                title: "Failed",
+                description: error.message || "There Is An Error.",
                 variant: "destructive",
             });
         } finally {

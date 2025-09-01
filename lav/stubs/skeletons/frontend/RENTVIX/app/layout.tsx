@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/layout/providers";
 import { RootClientShell } from "@/components/layout/root-client-shell";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "RentVix Pro - Vehicle Rental Management System",
@@ -36,7 +37,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         <Providers>
-          <RootClientShell>{children}</RootClientShell>
+          <RootClientShell>{children}<Toaster /></RootClientShell>
         </Providers>
       </body>
     </html>

@@ -99,12 +99,12 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
     const handleDelete = async (id: string) => {
         try {
             await deleteData("{{ENTITY_PLURAL}}", id);
-            toast({ title: "Berhasil!", description: "Data {{ENTITY_PASCAL_SINGULAR}} berhasil dihapus." });
+            toast({ title: "Success!", description: "{{ENTITY_PASCAL_SINGULAR}} Deleted Successfully." });
             setItems((prev) => prev.filter((item) => item.id !== id));
         } catch (error: any) {
             toast({
-            title: "Gagal menghapus",
-            description: error.message || "Terjadi kesalahan",
+            title: "Delete failed",
+            description: error.message || "There Is An Error",
             variant: "destructive",
             });
         }
