@@ -134,7 +134,7 @@ export function DataCustomerHeader({
 
   return (
     <div className="sticky top-16 z-10 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-4 px-4 pt-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Data Customer</h1>
           <p className="text-muted-foreground">Master data customer</p>

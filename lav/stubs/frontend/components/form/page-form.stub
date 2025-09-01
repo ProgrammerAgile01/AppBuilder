@@ -71,7 +71,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Form({
         }
     };
 
-    const CRUMBS = {{BREADCRUMB_JSON}} as { title: string; route_path?: string|null }[];
+    const CRUMBS = {{BREADCRUMB_JSON}} as { title: string; route_path?: string|null; level: number; type: string }[];
 
     return (
         <>
@@ -110,7 +110,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Form({
             </header>
 
             <div className="flex flex-1 flex-col gap-4 p-4">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                     <Button
                         variant="outline"
                         size="sm"

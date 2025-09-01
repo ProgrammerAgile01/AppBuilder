@@ -86,7 +86,12 @@ export function DataCustomerForm({
       level: 3,
       type: "menu",
     },
-  ] as { title: string; route_path?: string | null }[];
+  ] as {
+    title: string;
+    route_path?: string | null;
+    level: number;
+    type: string;
+  }[];
 
   return (
     <>
@@ -125,7 +130,7 @@ export function DataCustomerForm({
       </header>
 
       <div className="flex flex-1 flex-col gap-4 p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <Button
             variant="outline"
             size="sm"
