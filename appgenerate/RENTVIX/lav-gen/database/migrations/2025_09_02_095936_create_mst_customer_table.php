@@ -12,7 +12,14 @@ return new class extends Migration {
             $table->text('alamat');
             $table->string('nama_instansi');
 
-            $table->timestamps();
+            $table->timestamp('created_at')->nullable();
+            $table->string('created_by')->nullable(); // kalau ada auth bisa di set dari controller
+
+            $table->timestamp('updated_at')->nullable()->default(null);
+            $table->string('updated_by')->nullable(); // kaya created auth
+
+            $table->softDeletes();
+            $table->string('deleted_by')->nullable(); // sama juga kaya created at
         });
     }
 

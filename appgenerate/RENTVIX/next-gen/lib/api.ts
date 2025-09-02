@@ -171,13 +171,43 @@ export async function updateData(
 }
 
 /* ========== Delete ========== */
-export async function deleteData(entity: string, id: string | number) {
+export async function deleteData(entity: string, id: string | number): Promise<void> {
   const res = await fetch(`${API_URL}/${entity}/${id}`, {
     method: "DELETE",
     headers: { Accept: "application/json" },
   });
   if (!res.ok) return parseError(res);
   return await res.json();
+}
+
+export async function deletedData(entity: string) {
+  const res = await fetch(`${API_URL}/${entity}-deleted`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return res.json();
+}
+
+export async function restore(entity: string, id: string) {
+  const res = await fetch(`${API_URL}/${entity}/restore/${id}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return res.json();
+}
+
+export async function forceDelete(entity: string, id: string) {
+  const res = await fetch(`${API_URL}/${entity}/force/${id}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return res.json();
 }
 
 export async function fetchStats(entity: string) {

@@ -43,10 +43,14 @@ export function DataCustomerHeader({
   onAdd,
   search,
   status,
+  onOpenTrash,
+  deletedCount = 0,
 }: {
   onAdd: () => void;
   search?: string;
   status?: string;
+  onOpenTrash?: () => void;
+  deletedCount?: number;
 }) {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -102,6 +106,22 @@ export function DataCustomerHeader({
           <p className="text-muted-foreground">Master data customer</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
+          {onOpenTrash && (
+            <Button
+              variant="outline"
+              onClick={onOpenTrash}
+              className="relative border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Trash
+              {deletedCount > 0 && (
+                <Badge className="ml-2 bg-red-100 text-red-700 border-red-200">
+                  {deletedCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -510,9 +530,9 @@ export function DataCustomerTable({
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Hapus Data</AlertDialogTitle>
+                          <AlertDialogTitle>Delete Data</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Yakin ingin menghapus data ini?
+                            Are you sure you want to delete this data? This data is not permanently deleted and is moved to the trash.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

@@ -16,6 +16,7 @@ Route::get('data-pegawais/actions', [\App\Http\Controllers\Overrides\DataPegawai
 Route::match(['GET','POST'], 'data-pegawais/actions/{actionKey}', [\App\Http\Controllers\Overrides\DataPegawaiController::class, 'runAction']);
 Route::get('data-pegawais/export-excel', [\App\Http\Controllers\Generate\DataPegawaiController::class, 'exportExcel']);
 Route::apiResource('data-pegawais', \App\Http\Controllers\Overrides\DataPegawaiController::class);
+
 // == menus_START ==
 use App\Http\Controllers\Generate\MenuController;
 
@@ -26,17 +27,11 @@ Route::delete('menus/{id}/force', [MenuController::class, 'forceDelete']);
 Route::apiResource('menus', MenuController::class);
 // == menus_END ==
 
-
-
-
-
-
-
-
-
-
 // Route for data-customers
 Route::get('data-customers/actions', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'listActions']);
 Route::match(['GET','POST'], 'data-customers/actions/{actionKey}', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'runAction']);
 Route::get('data-customers/export-excel', [\App\Http\Controllers\Generate\DataCustomerController::class, 'exportExcel']);
 Route::apiResource('data-customers', \App\Http\Controllers\Overrides\DataCustomerController::class);
+Route::get('/data-customers-deleted', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'deletedData']);
+Route::post('/data-customers/restore/{id}', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'restore']);
+Route::delete('/data-customers/force/{id}', [\App\Http\Controllers\Overrides\DataCustomerController::class, 'forceDelete']);

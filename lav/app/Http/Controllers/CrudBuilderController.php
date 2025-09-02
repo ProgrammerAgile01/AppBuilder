@@ -2195,6 +2195,55 @@ BADGE;
                 // $kolomPertama
             ], $tableContent));
 
+            // === Generate Trash component ===
+            $trashStub = File::get(base_path('stubs/frontend/components/page-trash.stub'));
+
+            // Tentukan 2 kolom pertama yang layak tampil:
+            // skip kolom umum yang tidak informatif
+            $skip = ['id','created_at','updated_at','deleted_at','password','remember_token'];
+            $displayables = [];
+            foreach ($fields as $f) {
+                $name = $f->nama_kolom ?? null;
+                if (!$name) continue;
+                if (in_array($name, $skip)) continue;
+                $displayables[] = [
+                    'name' => $name,
+                    'label' => $f->label_id ?? Str::headline($name),
+                ];
+                if (count($displayables) >= 2) break;
+            }
+
+            // fallback jika field kurang
+            if (count($displayables) === 0) {
+                $displayables[] = ['name' => 'id', 'label' => 'ID'];
+            }
+            if (count($displayables) === 1) {
+                $displayables[] = ['name' => 'id', 'label' => 'ID'];
+            }
+
+            [$col1, $col2] = $displayables;
+
+            $trashOut = str_replace([
+                '{{ENTITY_PASCAL_SINGULAR}}',
+                '{{ENTITY_HEADLINE_SINGULAR}}',
+                '{{ENTITY_PLURAL}}',
+                '{{TRASH_COL1}}',
+                '{{TRASH_COL1_LABEL}}',
+                '{{TRASH_COL2}}',
+                '{{TRASH_COL2_LABEL}}',
+            ], [
+                $singularPascal,
+                $singularHeadline,
+                $entityPlural,
+                $col1['name'],
+                $col1['label'],
+                $col2['name'],
+                $col2['label'],
+            ], $trashStub);
+
+            // simpan ke components/{entity}/{entity}-trash.tsx
+            File::put("$folderComp/{$singularKebab}-trash.tsx", $trashOut);
+
             // generate components page view detail (BUAT YYYY)
             // $pageViewDetailTemplate = File::get(base_path('stubs/frontend/components/page-view-detail.stub'));
             // File::put("$folderComp/$singularKebab-view-detail.tsx", str_replace([

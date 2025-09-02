@@ -66,13 +66,21 @@ class DataCustomerController extends Controller
 
 
         $row = DataCustomer::create($data);
-        return response()->json(['success'=>true, 'data'=>$row], 201);
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil menambahkan data',
+            'data' => $row
+        ], 201);
     }
 
     public function show($id)
     {
         $row = DataCustomer::findOrFail($id);
-        return response()->json(['success'=>true, 'data'=>$row]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil melihat data dari id: ' . $id,
+            'data' => $row
+        ]);
     }
 
     public function update(Request $request, $id)
@@ -95,14 +103,66 @@ class DataCustomerController extends Controller
         $row->update($data);
 
 
-        return response()->json(['success'=>true, 'data'=>$row]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil update data',
+            'data' => $row
+        ]);
     }
 
+    // soft delete
     public function destroy($id)
     {
         $row = DataCustomer::findOrFail($id);
+
+        $row->deleted_by = 'admin'; // dummy nanti diganti auth
+        $row->save();
+
         $row->delete();
-        return response()->json(['success'=>true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil menghapus data sementara'
+        ]);
+    }
+
+    // restore
+    public function restore($id)
+    {
+        $row = DataCustomer::onlyTrashed()->findOrFail($id);
+        $row->restore();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data berhasil di kembalikan'
+        ]);
+    }
+
+    // hapus permanen (force)
+    public function forceDelete($id)
+    {
+        $row = DataCustomer::onlyTrashed()->findOrFail($id);
+        $row->forceDelete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data berhasil dihapus permanen'
+        ]);
+    }
+
+    // list data yang di hapus sementara
+    public function deletedData()
+    {
+        $row = DataCustomer::onlyTrashed()->orderByDesc('deleted_at')->get();
+
+        $totalDataDihapus = DataCustomer::onlyTrashed()->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Menampilkan data yang dihapus',
+            'total' => $totalDataDihapus,
+            'data' => $row
+        ]);
     }
 
     public function exportExcel(Request $request)

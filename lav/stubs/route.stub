@@ -3,3 +3,6 @@ Route::get('{{ROUTE_PATH}}/actions', [\App\Http\Controllers\Overrides\{{CONTROLL
 Route::match(['GET','POST'], '{{ROUTE_PATH}}/actions/{actionKey}', [\App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class, 'runAction']);
 Route::get('{{ROUTE_PATH}}/export-excel', [\App\Http\Controllers\Generate\{{CONTROLLER_NAME}}::class, 'exportExcel']);
 Route::apiResource('{{ROUTE_PATH}}', \App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class);
+Route::get('/{{ROUTE_PATH}}-deleted', [\App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class, 'deletedData']);
+Route::post('/{{ROUTE_PATH}}/restore/{id}', [\App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class, 'restore']);
+Route::delete('/{{ROUTE_PATH}}/force/{id}', [\App\Http\Controllers\Overrides\{{CONTROLLER_NAME}}::class, 'forceDelete']);
