@@ -113,7 +113,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Header({
               className="relative border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Trash
+              Sampah
               {deletedCount > 0 && (
                 <Badge className="ml-2 bg-red-100 text-red-700 border-red-200">
                   {deletedCount}
@@ -150,7 +150,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Header({
                     Modern PDF Report
                   </div>
                   <div className="text-xs text-gray-500">
-                    Beautiful design with gradients & styling
+                    Export ke PDF dengan tampilan yang cantik
                   </div>
                 </div>
               </DropdownMenuItem>
@@ -224,7 +224,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Filters({
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Input
-              placeholder="Search here..."
+              placeholder="Cari disini..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 text-foreground placeholder:text-muted-foreground"
@@ -283,8 +283,8 @@ export function ResultsInfo({
   return (
     <div className="flex justify-between items-center">
       <p className="text-sm text-muted-foreground">
-        Showing {_from}-{_to}
-        {typeof total === "number" ? ` of ${total}` : ""} {{ENTITY_HEADLINE_SINGULAR}}
+        Menampilkan {_from}-{_to}
+        {typeof total === "number" ? ` dari ${total}` : ""} {{ENTITY_HEADLINE_SINGULAR}}
       </p>
     </div>
   );
@@ -448,7 +448,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Table({
                         <AlertDialogHeader>
                           <AlertDialogTitle>Delete Data</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete this data? This data is not permanently deleted and is moved to the trash.
+                            Apakah kamu yakin untuk menghapus data ini?, data ini tidak dihapus permanen dan akan dipindahkan ke sampah.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

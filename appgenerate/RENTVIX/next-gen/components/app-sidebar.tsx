@@ -29,7 +29,7 @@ function GroupHeader({ name, color }: { name: string; color?: string }) {
 
 /* ====== Sumber data menu (JANGAN DIUBAH) – generator isi di sini ====== */
 const menuItems: any =
-[{ id: "pegawai", icon: Users, labelKey: "Pegawai" as any, description: "-", descriptionId: "-", count: 1, items: [{ icon: Users, labelKey: "Data Pegawai" as any, href: "/data-pegawai" }], groupId: "4", groupName: "Master Data", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" },{ id: "customer", icon: Users, labelKey: "Customer" as any, description: "Master Customer", descriptionId: "Master Customer", count: 1, items: [{ icon: Users, labelKey: "Data Customer" as any, href: "/data-customer" }], groupId: "4", groupName: "Master Data", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" }];
+[{ id: "pegawai", icon: Users, labelKey: "Pegawai" as any, description: "-", descriptionId: "-", count: 1, items: [{ icon: Users, labelKey: "Data Pegawai" as any, href: "/data-pegawai" }], groupId: "4", groupName: "Master Data", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" },{ id: "customer", icon: Users, labelKey: "Customer" as any, description: "Master Customer", descriptionId: "Master Customer", count: 1, items: [{ icon: Users, labelKey: "Data Customer" as any, href: "/data-customer" }], groupId: "4", groupName: "Master Data", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" },{ id: "booking-order", icon: BookOpen, labelKey: "Booking Order" as any, description: "Modul Booking & Order", descriptionId: "Modul Booking & Order", count: 1, items: [{ icon: FileText, labelKey: "Daftar Booking" as any, href: "/daftar-booking" }], groupId: "10", groupName: "Operasional Harian", groupColor: "#3b82f6", iconBg: "bg-primary/15", iconColor: "text-primary", activeBorder: "border-primary/40", borderColor: "border-border", hoverBorder: "hover:border-primary/30" }];
 /*======================================================================*/
 
 /** 👉 Export agar dipakai juga oleh drawer mobile */
@@ -241,7 +241,7 @@ function SharedSidebar() {
                               {language === "id" ? module.descriptionId : module.description}
                             </p>
                             <p className="text-xs text-muted-foreground/80 mt-1">
-                              {(module.items?.length ?? module.nestedItems?.length ?? 0)} fitur
+                              {(module.items?.length ?? module.nestedItems?.length ?? 0)} menu
                             </p>
                           </div>
                           <ChevronRight className={`h-4 w-4 ${active ? "text-primary" : "text-muted-foreground"}`} />
@@ -329,7 +329,7 @@ function SharedSidebar() {
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground truncate">Kelompok modul</p>
-                            <p className="text-xs text-muted-foreground/80 mt-1">{totalFeatures} fitur</p>
+                            <p className="text-xs text-muted-foreground/80 mt-1">{totalFeatures} modul</p>
                           </div>
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </>

@@ -125,13 +125,13 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
     const handleDelete = async (id: string) => {
         try {
             await deleteData("{{ENTITY_PLURAL}}", id);
-            toast({ title: "Success!", description: "Data Moved To Trash." });
+            toast({ title: "Sukses!", description: "Data dipindahkan ke sampah." });
             setItems((prev) => prev.filter((item) => item.id !== id));
             fetchDeletedCount();
         } catch (error: any) {
             toast({
-            title: "Delete failed",
-            description: error.message || "There Is An Error",
+            title: "Gagal menghapus",
+            description: error.message || "Terjadi kesalahan",
             variant: "destructive",
             });
         }
@@ -142,7 +142,9 @@ export function {{ENTITY_PASCAL_SINGULAR}}Page() {
     };
 
     const handleView = (id: string) => {
-        router.push(`/{{ENTITY_KEBAB_SINGULAR}}/view/${id}`);
+        // view belum dibuat jadi dinonaktifkan dulu
+        // router.push(`/{{ENTITY_KEBAB_SINGULAR}}/view/${id}`);
+        router.push(`/#`);
     };
 
     const openTrash = () => setShowTrash(true);

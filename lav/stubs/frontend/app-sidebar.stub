@@ -247,7 +247,7 @@ function SharedSidebar() {
                               {language === "id" ? module.descriptionId : module.description}
                             </p>
                             <p className="text-xs text-muted-foreground/80 mt-1">
-                              {(module.items?.length ?? module.nestedItems?.length ?? 0)} fitur
+                              {(module.items?.length ?? module.nestedItems?.length ?? 0)} menu
                             </p>
                           </div>
                           <ChevronRight className={`h-4 w-4 ${active ? "text-primary" : "text-muted-foreground"}`} />
@@ -335,7 +335,7 @@ function SharedSidebar() {
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground truncate">Kelompok modul</p>
-                            <p className="text-xs text-muted-foreground/80 mt-1">{totalFeatures} fitur</p>
+                            <p className="text-xs text-muted-foreground/80 mt-1">{totalFeatures} modul</p>
                           </div>
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </>

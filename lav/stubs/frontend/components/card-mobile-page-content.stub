@@ -49,21 +49,20 @@
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-foreground">
-                        Delete Vehicle
+                        Hapus Data
                       </AlertDialogTitle>
                       <AlertDialogDescription className="text-muted-foreground">
-                        Are you sure you want to delete {filtered{{ENTITY_PASCAL_SINGULAR}}.{{JUDUL}}}?
-                        This action cannot be undone.
+                        Apakah kamu yakin untuk menghapus {filtered{{ENTITY_PASCAL_SINGULAR}}.{{JUDUL}}}? Data ini akan dipindahkan ke sampah.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="border-border text-foreground hover:bg-accent hover:text-accent-foreground">
-                        Cancel
+                        Batal
                       </AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => handleDelete(filtered{{ENTITY_PASCAL_SINGULAR}}.id)}
                       >
-                        Delete
+                        Hapus
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

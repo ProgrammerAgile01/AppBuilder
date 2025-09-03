@@ -108,14 +108,14 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
         try {
             await restore("{{ENTITY_PLURAL}}", id);
             toast({
-                title: "Success!",
-                description: "Data restored successfully",
+                title: "Sukses!",
+                description: "Berhasil mengembalikan data",
             });
             fetchDeletedData();
         } catch (error) {
             toast({
-                title: "Error",
-                description: "Failed restore data",
+                title: "Gagal",
+                description: "Gagal mengembalikan data",
                 variant: "destructive",
             });
         } finally {
@@ -128,15 +128,15 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
         try {
             await forceDelete("{{ENTITY_PLURAL}}", id);
             toast({
-                title: "Success!",
-                description: "Successfully deleted this data permanently",
+                title: "Sukses!",
+                description: "Data berhasil dihapus secara permanen",
             });
             fetchDeletedData();
         } catch (error) {
             toast({
-                title: "Error",
+                title: "Gagal",
                 description:
-                "Failed to permanently delete data. Please try again.",
+                "Gagal menghapus data secara permanen, silahkan coba lagi",
                 variant: "destructive",
             });
         } finally {
@@ -162,7 +162,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                     <CardContent className="flex items-center justify-center h-64">
                         <div className="flex items-center gap-2">
                             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                            <span className="text-slate-600">Loading...</span>
+                            <span className="text-slate-600">Memuat data sampah...</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -181,10 +181,10 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                             </div>
                             <div>
                                 <CardTitle className="text-xl text-slate-900">
-                                    Trash {{ENTITY_HEADLINE_SINGULAR}}
+                                    Sampah {{ENTITY_HEADLINE_SINGULAR}}
                                 </CardTitle>
                                 <CardDescription>
-                                    Manage deleted {{ENTITY_HEADLINE_SINGULAR}}
+                                    Kelola data {{ENTITY_HEADLINE_SINGULAR}} yang dihapus
                                 </CardDescription>
                             </div>
                         </div>
@@ -193,7 +193,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                             onClick={onClose}
                             className="border-slate-300 bg-transparent"
                         >
-                            Close
+                            Tutup
                         </Button>
                     </div>
                 </CardHeader>
@@ -204,7 +204,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                         <div className="relative flex-1 max-w-sm">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <Input
-                                placeholder="Search deleted data..."
+                                placeholder="Cari data yang dihapus..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-10 h-11 border-slate-200 focus:border-red-500 focus:ring-red-500/20"
@@ -229,13 +229,13 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                             <Trash2 className="h-16 w-16 text-slate-400 mb-4" />
                             <h3 className="text-lg font-semibold text-slate-900 mb-2">
                                 {searchQuery
-                                ? "No data matched"
-                                : "Empty trash"}
+                                ? "Data tidak ditemukan"
+                                : "Sampah kosong"}
                             </h3>
                             <p className="text-slate-600 text-center max-w-md">
                                 {searchQuery
-                                ? "Try adjusting your search criteria."
-                                : "No data has been deleted yet. Deleted data will appear here."}
+                                ? "Coba ulangi pencarian anda."
+                                : "Tidak ada yang dihapus. Data yang dihapus akan muncul disini."}
                             </p>
                         </div>
                     ) : (
@@ -245,7 +245,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                                     <TableRow>
                                         <TableHead>{col1Label}</TableHead>
                                         <TableHead>{col2Label}</TableHead>
-                                        <TableHead className="text-right">Deleted At</TableHead>
+                                        <TableHead className="text-right">Dihapus pada</TableHead>
                                         <TableHead className="text-right">Aksi</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -266,14 +266,14 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle className="flex items-center gap-2">
                                                                     <RotateCcw className="h-5 w-5 text-green-600" />
-                                                                    Restore this data
+                                                                    Restore data ini
                                                                 </AlertDialogTitle>
                                                                 <AlertDialogDescription>
-                                                                    Are you sure to restore this data?
+                                                                    Apakah kamu yakin untuk mengembalikan data ini?
                                                                 </AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogCancel>Batal</AlertDialogCancel>
                                                                 <AlertDialogAction
                                                                     onClick={() => handleRestore(data.id)}
                                                                     className="bg-green-600 hover:bg-green-700"
@@ -305,24 +305,24 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                                                             <AlertDialogHeader>
                                                                 <AlertDialogTitle className="flex items-center gap-2 text-red-600">
                                                                     <AlertTriangle className="h-5 w-5" />
-                                                                    Delete Permanently
+                                                                    Hapus permanen
                                                                 </AlertDialogTitle>
                                                                 <AlertDialogDescription className="space-y-2">
                                                                     <p>
-                                                                        <strong className="text-red-600">WARNING:</strong> You will delete this data permanently.
+                                                                        <strong className="text-red-600">PERHATIAN:</strong> Kamu akan menghapus data ini secara permanen.
                                                                     </p>
                                                                     <p>
-                                                                        This action <strong>CANNOT BE UNDONE</strong> and will delete associated data
+                                                                        Aksi ini <strong>TIDAK BISA DIKEMBALIKAN</strong> dan akan menghapus permanen data terkait
                                                                     </p>
                                                                 </AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogCancel>Batal</AlertDialogCancel>
                                                                 <AlertDialogAction
                                                                     onClick={() => handlePermanentDelete(data.id)}
                                                                     className="bg-red-600 hover:bg-red-700"
                                                                 >
-                                                                    Delete Permanently
+                                                                    Hapus Permanen
                                                                 </AlertDialogAction>
                                                             </AlertDialogFooter>
                                                         </AlertDialogContent>
@@ -337,7 +337,7 @@ export function {{ENTITY_PASCAL_SINGULAR}}Trash({ onClose }: {{ENTITY_PASCAL_SIN
                                                         className="flex-1 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
                                                     >
                                                         <Trash2 className="mr-2 h-4 w-4" />
-                                                        Delete Permanently
+                                                        Hapus Permanen
                                                     </Button>
                                                 </div>
                                             </TableCell>
