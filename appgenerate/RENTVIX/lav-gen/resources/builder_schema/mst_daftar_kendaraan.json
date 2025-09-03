@@ -1,0 +1,21 @@
+{
+    "title": "Daftar Kendaraan",
+    "menu_title": "Daftar Kendaraan",
+    "table": "mst_daftar_kendaraan",
+    "columns": [
+        {
+            "source": "jenis",
+            "label": "New Content",
+            "display": "text"
+        },
+        {
+            "source": "warna",
+            "label": "New Content",
+            "display": "text"
+        }
+    ],
+    "summary": {
+        "group_by": "status",
+        "sum": []
+    }
+}

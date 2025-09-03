@@ -14,3 +14,15 @@ Route::delete('menus/{id}/force', [MenuController::class, 'forceDelete']);
 Route::apiResource('menus', MenuController::class);
 // == menus_END ==
 
+
+
+
+
+// Route for daftar-kendaraans
+Route::get('daftar-kendaraans/actions', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'listActions']);
+Route::match(['GET','POST'], 'daftar-kendaraans/actions/{actionKey}', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'runAction']);
+Route::get('daftar-kendaraans/export-excel', [\App\Http\Controllers\Generate\DaftarKendaraanController::class, 'exportExcel']);
+Route::apiResource('daftar-kendaraans', \App\Http\Controllers\Overrides\DaftarKendaraanController::class);
+Route::get('/daftar-kendaraans-deleted', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'deletedData']);
+Route::post('/daftar-kendaraans/restore/{id}', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'restore']);
+Route::delete('/daftar-kendaraans/force/{id}', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'forceDelete']);

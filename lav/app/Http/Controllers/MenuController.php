@@ -960,7 +960,7 @@ PHP;
             ->orderBy('order_number')
             ->get([
                 'id','parent_id','level','type','title','icon','color','order_number',
-                'crud_builder_id','product_code','route_path','is_active','note',
+                'crud_builder_id', 'product_id', 'product_code','route_path','is_active','note',
                 'created_by','deleted_at','created_at','updated_at',
             ])
             ->map(function ($m) {
@@ -1004,7 +1004,7 @@ class MenuSeeder extends Seeder
         // --- whitelist kolom yang valid di schema target
         \$allowed = [
             'id','parent_id','level','type','title','icon','color','order_number',
-            'crud_builder_id','product_code','route_path','is_active','note',
+            'crud_builder_id', 'product_id', 'product_code','route_path','is_active','note',
             'created_by','deleted_at','created_at','updated_at',
         ];
         \$allowFlip = array_flip(\$allowed);
@@ -1028,6 +1028,7 @@ class MenuSeeder extends Seeder
                 'color' => null,
                 'order_number' => 0,
                 'crud_builder_id' => null,
+                'product_id' => null,
                 'product_code' => null,
                 'route_path' => null,
                 'is_active' => true,
