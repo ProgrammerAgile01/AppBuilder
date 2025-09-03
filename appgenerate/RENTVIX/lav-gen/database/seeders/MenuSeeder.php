@@ -1542,7 +1542,7 @@ class MenuSeeder extends Seeder
     'icon' => 'Folder',
     'color' => NULL,
     'order_number' => 1,
-    'crud_builder_id' => NULL,
+    'crud_builder_id' => 2,
     'product_id' => 'f7a0c671-bc48-4bbe-b077-1f9fbdb39547',
     'product_code' => 'RENTVIX',
     'route_path' => '/daftar-kendaraan',
@@ -1551,7 +1551,7 @@ class MenuSeeder extends Seeder
     'created_by' => NULL,
     'deleted_at' => NULL,
     'created_at' => '2025-09-02T09:21:09.000000Z',
-    'updated_at' => '2025-09-02T09:21:09.000000Z',
+    'updated_at' => '2025-09-03T04:24:02.000000Z',
     'is_deleted' => false,
   ),
   70 => 

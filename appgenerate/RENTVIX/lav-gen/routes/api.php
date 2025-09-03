@@ -18,6 +18,7 @@ Route::apiResource('menus', MenuController::class);
 
 
 
+
 // Route for daftar-kendaraans
 Route::get('daftar-kendaraans/actions', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'listActions']);
 Route::match(['GET','POST'], 'daftar-kendaraans/actions/{actionKey}', [\App\Http\Controllers\Overrides\DaftarKendaraanController::class, 'runAction']);
